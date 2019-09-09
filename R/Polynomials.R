@@ -1,6 +1,13 @@
 JackPolNaive <- function(n, lambda, alpha, basis = "canonical"){
   stopifnot(isPositiveInteger(n), alpha >= 0, isPartition(lambda))
   basis <- match.arg(basis, c("canonical", "MSF"))
+  if(length(lambda) == 0L){
+    if(basis == "canonical"){
+      return(constant(1))
+    }else{
+      return("M_()")
+    }
+  }
   gmp <- is.bigq(alpha)
   lambda <- lambda[lambda > 0L]
   if(length(lambda) > n) return(constant(0))
@@ -96,7 +103,8 @@ JackPolDK <- function(n, lambda, alpha){
 #' for \code{algorithm = "DK"} the canonical basis is always used and
 #' this parameter is ignored
 #'
-#' @return A polynomial (\code{mvp} object; see \link[mvp]{mvp-package}).
+#' @return A polynomial (\code{mvp} object; see \link[mvp]{mvp-package}) or a
+#' character string if \code{basis = "MSF"}.
 #' @importFrom mvp constant mvp
 #' @importFrom gmp is.bigq
 #' @export
@@ -124,6 +132,13 @@ JackPol <- function(n, lambda, alpha, algorithm = "DK",
 ZonalPolNaive <- function(m, lambda, basis = "canonical", exact = TRUE){
   stopifnot(isPositiveInteger(m), isPartition(lambda))
   basis <- match.arg(basis, c("canonical", "MSF"))
+  if(length(lambda) == 0L){
+    if(basis == "canonical"){
+      return(constant(1))
+    }else{
+      return("M_()")
+    }
+  }
   lambda <- lambda[lambda > 0L]
   if(length(lambda) > m) return(constant(0))
   lambda00 <- numeric(sum(lambda))
@@ -191,7 +206,8 @@ ZonalPolDK <- function(m, lambda){
 #' @param exact logical, whether to get rational coefficients when using
 #' \code{algorithm = "naive"}; ignored if \code{algorithm = "DK"}
 #'
-#' @return A polynomial (\code{mvp} object; see \link[mvp]{mvp-package}).
+#' @return A polynomial (\code{mvp} object; see \link[mvp]{mvp-package}) or a
+#' character string if \code{basis = "MSF"}.
 #' @importFrom mvp constant mvp
 #' @export
 #'
@@ -214,6 +230,13 @@ SchurPolNaive <- function(m, lambda, basis = "canonical",
                           exact = TRUE){
   stopifnot(isPositiveInteger(m), isPartition(lambda))
   basis <- match.arg(basis, c("canonical", "MSF"))
+  if(length(lambda) == 0L){
+    if(basis == "canonical"){
+      return(constant(1))
+    }else{
+      return("M_()")
+    }
+  }
   lambda <- lambda[lambda > 0L]
   if(length(lambda) > m) return(constant(0))
   lambda00 <- integer(sum(lambda))
@@ -305,7 +328,8 @@ SchurPolDK <- function(n, lambda){
 #' @param exact logical, whether to get rational coefficients when using
 #' \code{algorithm = "naive"}; ignored if \code{algorithm = "DK"}
 #'
-#' @return A polynomial (\code{mvp} object; see \link[mvp]{mvp-package}).
+#' @return A polynomial (\code{mvp} object; see \link[mvp]{mvp-package}) or a
+#' character string if \code{basis = "MSF"}.
 #' @importFrom mvp constant mvp
 #' @export
 #'
@@ -327,6 +351,13 @@ SchurPol <- function(n, lambda, algorithm = "DK", basis = "canonical",
 ZonalQPolNaive <- function(m, lambda, basis = "canonical", exact = TRUE){
   stopifnot(isPositiveInteger(m), isPartition(lambda))
   basis <- match.arg(basis, c("canonical", "MSF"))
+  if(length(lambda) == 0L){
+    if(basis == "canonical"){
+      return(constant(1))
+    }else{
+      return("M_()")
+    }
+  }
   lambda <- lambda[lambda > 0L]
   if(length(lambda) > m) return(constant(0))
   lambda00 <- numeric(sum(lambda))
@@ -381,7 +412,7 @@ ZonalQPolDK <- function(m, lambda){
 
 #' Quaternionic zonal polynomial
 #'
-#' Returns the quaternionic zonal polynomial.
+#' Returns the quaternionic (or symplectic) zonal polynomial.
 #'
 #' @param n number of variables, a positive integer
 #' @param lambda an integer partition, given as a vector of decreasing
@@ -394,7 +425,8 @@ ZonalQPolDK <- function(m, lambda){
 #' @param exact logical, whether to get rational coefficients when using
 #' \code{algorithm = "naive"}; ignored if \code{algorithm = "DK"}
 
-#' @return A polynomial (\code{mvp} object; see \link[mvp]{mvp-package}).
+#' @return A polynomial (\code{mvp} object; see \link[mvp]{mvp-package}) or a
+#' character string if \code{basis = "MSF"}.
 #' @importFrom mvp constant mvp
 #' @export
 #'
