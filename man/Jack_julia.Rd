@@ -8,7 +8,11 @@ Jack_julia()
 }
 \value{
 A list of functions having the same names as the R functions of this
-  package (\code{Jack}, \code{JackPol}, \code{Schur}, etc).
+  package (\code{Jack}, \code{JackPol}, \code{Schur}, etc). The
+  \code{XXXPol} functions have an argument \code{poly}, whose possible
+  value is \code{"mvp"} (default) or \code{"gmpoly"}, and this is the
+  class of the polynomial returned by these functions. See the examples
+  and the \href{https://github.com/stla/jackR#readme}{README} file.
 }
 \description{
 Evaluate the Jack polynomials with Julia. This is highly faster.
@@ -22,9 +26,16 @@ See \code{\link[JuliaConnectoR]{JuliaConnectoR-package}} for
 library(jack)
 \donttest{if(JuliaConnectoR::juliaSetupOk()){
   julia <- Jack_julia()
+  # numerical evaluation ####
+  julia$Jack(x = c(2, 2/3), lambda = c(3, 1), alpha = 3/2)
+  # to pass rational numbers, use strings:
+  julia$Jack(x = c("2", "2/3"), lambda = c(3, 1), alpha = "3/2")
+  # symbolic polynomials ####
   # for `JackPol`, you can pass a rational `alpha` as a string:
   ( pol <- julia$JackPol(m = 2, lambda = c(3, 1), alpha = "3/2") )
   class(pol)
+  # you _must_ give `alpha` as a string if you choose `poly = "gmpoly"`
+  julia$JackPol(m = 2, lambda = c(3, 1), alpha = "3/2", poly = "gmpoly")
   JuliaConnectoR::stopJulia()
 }}
 }

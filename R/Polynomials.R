@@ -55,6 +55,8 @@ JackPolNaive <- function(n, lambda, alpha, basis = "canonical"){
   }
 }
 
+#' @importFrom mvp constant mvp
+#' @noRd
 JackPolDK <- function(n, lambda, alpha){
   stopifnot(isPositiveInteger(n), alpha >= 0, isPartition(lambda))
   jac <- function(m, k, mu, nu, beta){
@@ -87,6 +89,56 @@ JackPolDK <- function(n, lambda, alpha){
   jac(n, 0L, lambda, lambda, 1)
 }
 
+#' @importFrom gmpoly gmpoly gmpolyConstant gmpolyGrow
+#' @importFrom gmp as.bigq
+#' @noRd
+JackPolDK_gmp <- function(n, lambda, alpha){
+  stopifnot(isPositiveInteger(n), alpha >= 0, isPartition(lambda))
+  jac <- function(m, k, mu, nu, beta){
+    if(length(nu) == 0L || nu[1L] == 0L || m == 0L){
+      return(gmpolyConstant(m, 1L))
+    }
+    if(length(nu) > m && nu[m+1L] > 0L) return(gmpolyConstant(m, 0L))
+    if(m == 1L){
+      return(gmpoly(
+        coeffs = prod(alpha * seq_len(nu[1L]-1L) + 1L),
+        powers = rbind(nu[1L])
+      ))
+    }
+    if(k == 0L && inherits(s <- S[[.N(lambda, nu), m]], "gmpoly")) return(s)
+    i <- max(1L, k)
+    s <- gmpolyGrow(jac(m-1L, 0L, nu, nu, oneq)) * gmpolyConstant(m, beta) *
+      gmpoly(
+        coeffs = oneq,
+        powers = rbind(c(rep(0L, m-1L), sum(mu)-sum(nu)))
+      )
+    while(length(nu) >= i && nu[i] > 0L){
+      if(length(nu) == i && nu[i] > 0L || nu[i] > nu[i+1L]){
+        .nu <- nu; .nu[i] <- nu[i]-1L
+        gamma <- beta * .betaratio(mu, nu, i, alpha)
+        if(nu[i] > 1L){
+          s <- s + jac(m, i, mu, .nu, gamma)
+        }else{
+          s <- s + gmpolyGrow(jac(m-1L, 0L, .nu, .nu, oneq)) *
+            gmpolyConstant(m, gamma) *
+            gmpoly(
+              coeffs = oneq,
+              powers = rbind(c(rep(0L, m-1L), sum(mu)-sum(.nu)))
+            )
+        }
+      }
+      i <- i + 1L
+    }
+    if(k == 0L) S[[.N(lambda, nu), m]] <- s
+    return(s)
+  }
+  Nlambdalambda <- .N(lambda, lambda)
+  S <- as.list(rep(NA, Nlambdalambda * n))
+  dim(S) <- c(Nlambdalambda, n)
+  oneq <- as.bigq(1L)
+  jac(n, 0L, lambda, lambda, oneq)
+}
+
 #' Jack polynomial
 #'
 #' Returns the Jack polynomial.
@@ -94,24 +146,25 @@ JackPolDK <- function(n, lambda, alpha){
 #' @param n number of variables, a positive integer
 #' @param lambda an integer partition, given as a vector of decreasing
 #' integers
-#' @param alpha parameter of the Jack polynomial, always a positive number
-#' for \code{algorithm = "DK"}, a positive number or a positive \code{bigq}
-#' rational number for \code{algorithm = "naive"}
+#' @param alpha parameter of the Jack polynomial, a positive number, possibly
+#'   a \code{\link[gmp]{bigq}} rational number
 #' @param algorithm the algorithm used, either \code{"DK"} or \code{"naive"}
 #' @param basis the polynomial basis for \code{algorithm = "naive"},
 #' either \code{"canonical"} or \code{"MSF"} (monomial symmetric functions);
 #' for \code{algorithm = "DK"} the canonical basis is always used and
 #' this parameter is ignored
 #'
-#' @return A polynomial (\code{mvp} object; see \link[mvp]{mvp-package}) or a
-#' character string if \code{basis = "MSF"}.
-#' @importFrom mvp constant mvp
+#' @return A \code{mvp} multivariate polynomial (see \link[mvp]{mvp-package}),
+#'  or a \code{\link[gmpoly]{gmpoly}} multivariate polynomial if \code{alpha}
+#'  is a \code{bigq} rational number and \code{algorithm = "DK"}, or a
+#'  character string if \code{basis = "MSF"}.
 #' @importFrom gmp is.bigq
 #' @export
 #'
 #' @examples JackPol(3, lambda = c(3,1), alpha = gmp::as.bigq(2,3),
 #'                   algorithm = "naive")
 #' JackPol(3, lambda = c(3,1), alpha = 2/3, algorithm = "DK")
+#' JackPol(3, lambda = c(3,1), alpha = gmp::as.bigq(2,3), algorithm = "DK")
 #' JackPol(3, lambda = c(3,1), alpha= gmp::as.bigq(2,3),
 #'         algorithm = "naive", basis = "MSF")
 JackPol <- function(n, lambda, alpha, algorithm = "DK",
@@ -124,9 +177,10 @@ JackPol <- function(n, lambda, alpha, algorithm = "DK",
   lambda <- as.integer(lambda)
   if(algo == "DK"){
     if(is.bigq(alpha)){
-      stop("Algorithm `DK` is not implemented for rational `alpha`")
+      JackPolDK_gmp(n, lambda, alpha)
+    }else{
+      JackPolDK(n, lambda, alpha)
     }
-    JackPolDK(n, lambda, alpha)
   }else{
     JackPolNaive(n, lambda, alpha, basis)
   }
@@ -189,10 +243,21 @@ ZonalPolNaive <- function(m, lambda, basis = "canonical", exact = TRUE){
 }
 
 ZonalPolDK <- function(m, lambda){
-  jack <- JackPolDK(m, lambda, alpha= 2)
+  jack <- JackPolDK(m, lambda, alpha = 2)
   jlambda <- sum(logHookLengths(lambda, alpha = 2))
   n <- sum(lambda)
   exp(n*log(2) + lfactorial(n) - jlambda) * jack
+}
+
+#' @importFrom gmp as.bigq factorialZ
+#' @importFrom gmpoly gmpolyConstant
+#' @noRd
+ZonalPolDK_gmp <- function(m, lambda){
+  twoq <- as.bigq(2)
+  jack <- JackPolDK_gmp(m, lambda, alpha = twoq)
+  jlambda <- prod(hookLengths_gmp(lambda, alpha = twoq))
+  n <- sum(lambda)
+  gmpolyConstant(m, twoq^n * factorialZ(n) / jlambda) * jack
 }
 
 #' Zonal polynomial
@@ -207,23 +272,30 @@ ZonalPolDK <- function(m, lambda){
 #' either \code{"canonical"} or \code{"MSF"} (monomial symmetric functions);
 #' for \code{algorithm = "DK"} the canonical basis is always used and
 #' this parameter is ignored
-#' @param exact logical, whether to get rational coefficients when using
-#' \code{algorithm = "naive"}; ignored if \code{algorithm = "DK"}
+#' @param exact logical, whether to get rational coefficients
 #'
-#' @return A polynomial (\code{mvp} object; see \link[mvp]{mvp-package}) or a
-#' character string if \code{basis = "MSF"}.
+#' @return A \code{mvp} multivariate polynomial (see \link[mvp]{mvp-package}),
+#'  or a \code{\link[gmpoly]{gmpoly}} multivariate polynomial if
+#'  \code{exact = TRUE} and \code{algorithm = "DK"}, or a
+#'  character string if \code{basis = "MSF"}.
+#'
 #' @importFrom mvp constant mvp
 #' @export
 #'
 #' @examples ZonalPol(3, lambda = c(3,1), algorithm = "naive")
 #' ZonalPol(3, lambda = c(3,1), algorithm = "DK")
+#' ZonalPol(3, lambda = c(3,1), algorithm = "DK", exact = FALSE)
 #' ZonalPol(3, lambda = c(3,1), algorithm = "naive", basis = "MSF")
 ZonalPol <- function(n, lambda, algorithm = "DK", basis = "canonical",
                      exact = TRUE){
   algo <- match.arg(algorithm, c("DK", "naive"))
   lambda <- as.integer(lambda)
   if(algo == "DK"){
-    ZonalPolDK(n, lambda)
+    if(exact){
+      ZonalPolDK_gmp(n, lambda)
+    }else{
+      ZonalPolDK(n, lambda)
+    }
   }else{
     ZonalPolNaive(n, lambda, basis, exact)
   }
@@ -286,15 +358,17 @@ SchurPolNaive <- function(m, lambda, basis = "canonical",
   }
 }
 
+#' @importFrom mvp constant mvp
+#' @noRd
 SchurPolDK <- function(n, lambda){
   stopifnot(isPositiveInteger(n), isPartition(lambda))
   sch <- function(m, k, nu){
-    if(length(nu) == 0L || nu[1L]==0L || m == 0L){
+    if(length(nu) == 0L || nu[1L] == 0L || m == 0L){
       return(constant(1))
     }
     if(length(nu) > m && nu[m+1L] > 0L) return(constant(0))
     if(m == 1L) return(mvp(x[1L], nu[1L], 1))
-    if(!is.na(s <- S[[.N(lambda,nu),m]])) return(s)
+    if(!is.na(s <- S[[.N(lambda, nu), m]])) return(s)
     s <- sch(m-1L, 1L, nu)
     i <- k
     while(length(nu) >= i && nu[i] > 0L){
@@ -308,12 +382,52 @@ SchurPolDK <- function(n, lambda){
       }
       i <- i + 1L
     }
-    if(k == 1L) S[[.N(lambda,nu),m]] <- s
+    if(k == 1L) S[[.N(lambda, nu), m]] <- s
     return(s)
   }
   x <- paste0("x_", 1L:n)
-  S <- as.list(rep(NA, .N(lambda,lambda)*n))
-  dim(S) <- c(.N(lambda,lambda), n)
+  Nlambdalambda <- .N(lambda,lambda)
+  S <- as.list(rep(NA, Nlambdalambda*n))
+  dim(S) <- c(Nlambdalambda, n)
+  sch(n, 1L, as.integer(lambda))
+}
+
+#' @importFrom gmpoly gmpolyConstant gmpoly gmpolyGrow
+SchurPolDK_gmp <- function(n, lambda){
+  stopifnot(isPositiveInteger(n), isPartition(lambda))
+  sch <- function(m, k, nu){
+    if(length(nu) == 0L || nu[1L] == 0L || m == 0L){
+      return(gmpolyConstant(m, 1L))
+    }
+    if(length(nu) > m && nu[m+1L] > 0L) return(gmpolyConstant(m, 0L))
+    if(m == 1L) return(gmpoly(coeffs = oneq, powers = rbind(nu[1L])))
+    if(inherits(s <- S[[.N(lambda, nu), m]], "gmpoly")) return(s)
+    s <- gmpolyGrow(sch(m-1L, 1L, nu))
+    i <- k
+    while(length(nu) >= i && nu[i] > 0L){
+      if(length(nu) == i || nu[i] > nu[i+1L]){
+        .nu <- nu; .nu[i] <- nu[i]-1L
+        if(nu[i] > 1L){
+          s <- s + x[[m]] * sch(m, i, .nu)
+        }else{
+          s <- s + x[[m]] * gmpolyGrow(sch(m-1L, 1L, .nu))
+        }
+      }
+      i <- i + 1L
+    }
+    if(k == 1L) S[[.N(lambda, nu), m]] <- s
+    return(s)
+  }
+  Nlambdalambda <- .N(lambda,lambda)
+  S <- as.list(rep(NA, Nlambdalambda*n))
+  dim(S) <- c(Nlambdalambda, n)
+  oneq <- as.bigq(1L)
+  x <- lapply(1L:n, function(m){
+    gmpoly(
+      coeffs = oneq,
+      powers = rbind(c(rep(0L, m-1L), 1L))
+    )
+  })
   sch(n, 1L, as.integer(lambda))
 }
 
@@ -329,23 +443,29 @@ SchurPolDK <- function(n, lambda){
 #' either \code{"canonical"} or \code{"MSF"} (monomial symmetric functions);
 #' for \code{algorithm = "DK"} the canonical basis is always used and
 #' this parameter is ignored
-#' @param exact logical, whether to get rational coefficients when using
-#' \code{algorithm = "naive"}; ignored if \code{algorithm = "DK"}
+#' @param exact logical, whether to use exact arithmetic
 #'
-#' @return A polynomial (\code{mvp} object; see \link[mvp]{mvp-package}) or a
-#' character string if \code{basis = "MSF"}.
-#' @importFrom mvp constant mvp
+#' @return A \code{mvp} multivariate polynomial (see \link[mvp]{mvp-package}),
+#'  or a \code{\link[gmpoly]{gmpoly}} multivariate polynomial if
+#'  \code{exact = TRUE} and \code{algorithm = "DK"}, or a
+#'  character string if \code{basis = "MSF"}.
+#'
 #' @export
 #'
 #' @examples SchurPol(3, lambda = c(3,1), algorithm = "naive")
 #' SchurPol(3, lambda = c(3,1), algorithm = "DK")
+#' SchurPol(3, lambda = c(3,1), algorithm = "DK", exact = FALSE)
 #' SchurPol(3, lambda = c(3,1), algorithm = "naive", basis = "MSF")
 SchurPol <- function(n, lambda, algorithm = "DK", basis = "canonical",
                      exact = TRUE){
   algo <- match.arg(algorithm, c("DK", "naive"))
   lambda <- as.integer(lambda)
   if(algo == "DK"){
-    SchurPolDK(n, lambda)
+    if(exact){
+      SchurPolDK_gmp(n, lambda)
+    }else{
+      SchurPolDK(n, lambda)
+    }
   }else{
     SchurPolNaive(n, lambda, basis, exact)
   }
@@ -408,10 +528,21 @@ ZonalQPolNaive <- function(m, lambda, basis = "canonical", exact = TRUE){
 }
 
 ZonalQPolDK <- function(m, lambda){
-  jack <- JackPolDK(m, lambda, alpha= 1/2)
+  jack <- JackPolDK(m, lambda, alpha = 1/2)
   jlambda <- sum(logHookLengths(lambda, alpha = 1/2))
   n <- sum(lambda)
   exp(-n*log(2) + lfactorial(n) - jlambda) * jack
+}
+
+#' @importFrom gmp as.bigq factorialZ
+#' @importFrom gmpoly gmpolyConstant
+#' @noRd
+ZonalQPolDK_gmp <- function(m, lambda){
+  onehalfq <- as.bigq(1L, 2L)
+  jack <- JackPolDK_gmp(m, lambda, alpha = onehalfq)
+  jlambda <- prod(hookLengths_gmp(lambda, alpha = onehalfq))
+  n <- sum(lambda)
+  gmpolyConstant(m, onehalfq^n * factorialZ(n) / jlambda) * jack
 }
 
 #' Quaternionic zonal polynomial
@@ -420,29 +551,35 @@ ZonalQPolDK <- function(m, lambda){
 #'
 #' @param n number of variables, a positive integer
 #' @param lambda an integer partition, given as a vector of decreasing
-#' integers
+#'   integers
 #' @param algorithm the algorithm used, either \code{"DK"} or \code{"naive"}
 #' @param basis the polynomial basis for \code{algorithm = "naive"},
 #' either \code{"canonical"} or \code{"MSF"} (monomial symmetric functions);
 #' for \code{algorithm = "DK"} the canonical basis is always used and
 #' this parameter is ignored
-#' @param exact logical, whether to get rational coefficients when using
-#' \code{algorithm = "naive"}; ignored if \code{algorithm = "DK"}
-
-#' @return A polynomial (\code{mvp} object; see \link[mvp]{mvp-package}) or a
-#' character string if \code{basis = "MSF"}.
-#' @importFrom mvp constant mvp
+#' @param exact logical, whether to get rational coefficients
+#'
+#' @return A \code{mvp} multivariate polynomial (see \link[mvp]{mvp-package}),
+#'  or a \code{\link[gmpoly]{gmpoly}} multivariate polynomial if
+#'  \code{exact = TRUE} and \code{algorithm = "DK"}, or a
+#'  character string if \code{basis = "MSF"}.
+#'
 #' @export
 #'
 #' @examples ZonalQPol(3, lambda = c(3,1), algorithm = "naive")
 #' ZonalQPol(3, lambda = c(3,1), algorithm = "DK")
+#' ZonalQPol(3, lambda = c(3,1), algorithm = "DK", exact = FALSE)
 #' ZonalQPol(3, lambda = c(3,1), algorithm = "naive", basis = "MSF")
 ZonalQPol <- function(n, lambda, algorithm = "DK", basis = "canonical",
                      exact = TRUE){
   algo <- match.arg(algorithm, c("DK", "naive"))
   lambda <- as.integer(lambda)
   if(algo == "DK"){
-    ZonalQPolDK(n, lambda)
+    if(exact){
+      ZonalQPolDK_gmp(n, lambda)
+    }else{
+      ZonalQPolDK(n, lambda)
+    }
   }else{
     ZonalQPolNaive(n, lambda, basis, exact)
   }

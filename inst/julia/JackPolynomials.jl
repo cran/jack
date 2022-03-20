@@ -61,22 +61,30 @@ Evaluates a Jack polynomial.
 - `alpha`: alpha parameter
 """
 function Jack(
-  x::Vector{C},
+  x::Union{Vector{C},Vector{Vector{I}}},
   lambda::Vector{I},
-  alpha::T,
+  alpha::Union{T,Vector{I}},
 ) where {T<:Real,I<:Integer,C<:Number}
   if !isPartition(lambda)
     error("`lambda` must be a partition of an integer")
   end
+  if typeof(alpha) == Vector{I}
+    alpha = alpha[1] // alpha[2]
+  end
+  alphaType = typeof(alpha)
+  if eltype(x) == Vector{I}
+    x = map((pq) -> pq[1] // pq[2], x)
+  end
+  xType = eltype(x)
   if alpha <= 0
     error("`alpha` must be positive")
   end
   function jac(m::I, k::I, mu::Vector{I}, nu::Vector{I}, beta::Real)
     if isempty(nu) || nu[1] == 0 || m == 0
-      return C(1)
+      return xType(1)
     end
     if length(nu) > m && nu[m+1] > 0
-      return C(0)
+      return xType(0)
     end
     if m == 1
       return x[1]^(nu[1]) * prod(1 .+ alpha .* collect(1:(nu[1]-1)))
@@ -86,7 +94,7 @@ function Jack(
       return v
     end
     i = max(1, k)
-    s = jac(m - 1, 0, nu, nu, T(1)) * beta * x[m]^(sum(mu) - sum(nu))
+    s = jac(m - 1, 0, nu, nu, alphaType(1)) * beta * x[m]^(sum(mu) - sum(nu))
     while length(nu) >= i && nu[i] > 0
       if length(nu) == i || nu[i] > nu[i+1]
         nuPrime = copy(nu)
@@ -97,7 +105,8 @@ function Jack(
         else
           s =
             s +
-            jac(m - 1, 0, nuPrime, nuPrime, T(1)) * gamma * x[m]^(sum(mu) - sum(nuPrime))
+            jac(m - 1, 0, nuPrime, nuPrime, alphaType(1)) *
+            gamma * x[m]^(sum(mu) - sum(nuPrime))
         end
       end
       i += 1
@@ -108,8 +117,8 @@ function Jack(
     return s
   end # end jac --------------------------------------------------------------
   lx = length(x)
-  S = Array{Union{Missing,C}}(missing, _N(lambda, lambda), lx)
-  jac(lx, 0, lambda, lambda, T(1))
+  S = Array{Union{Missing,xType}}(missing, _N(lambda, lambda), lx)
+  jac(lx, 0, lambda, lambda, alphaType(1))
 end
 
 # ------------------------------------------------------------------------------
@@ -248,11 +257,15 @@ Evaluates a zonal polynomial.
 - `lambda`: partition of an integer
 """
 function Zonal(
-  x::Vector{<:Union{R,Complex{R}}},
-  lambda::Vector{<:Integer},
-) where {R<:Real}
-  jack = Jack(x, lambda, R(2))
-  jlambda = prod(hookLengths(lambda, R(2)))
+  x::Union{Vector{T},Vector{Vector{I}}},
+  lambda::Vector{I}
+) where {T<:Number,I<:Integer}
+  alpha = 2
+  if eltype(x) == Vector{I}
+    alpha = 2 // 1
+  end
+  jack = Jack(x, lambda, alpha)
+  jlambda = prod(hookLengths(lambda, alpha))
   n = sum(lambda)
   return jack * 2^n * factorial(n) / jlambda
 end
@@ -300,11 +313,15 @@ Evaluates a quaternionic zonal polynomial.
 - `lambda`: partition of an integer
 """
 function ZonalQ(
-  x::Vector{<:Union{R,Complex{R}}},
-  lambda::Vector{<:Integer},
-) where {R<:Real}
-  jack = Jack(x, lambda, R(0.5))
-  jlambda = prod(hookLengths(lambda, R(0.5)))
+  x::Union{Vector{T},Vector{Vector{I}}},
+  lambda::Vector{I}
+) where {T<:Number,I<:Integer}
+  alpha = 0.5
+  if eltype(x) == Vector{I}
+    alpha = 1 // 2
+  end
+  jack = Jack(x, lambda, alpha)
+  jlambda = prod(hookLengths(lambda, alpha))
   n = sum(lambda)
   return jack * factorial(n) / 2^n / jlambda
 end
@@ -351,16 +368,23 @@ Evaluates a Schur polynomial.
 - `x`: vector of real or complex numbers
 - `lambda`: partition of an integer
 """
-function Schur(x::Vector{T}, lambda::Vector{I}) where {T<:Number,I<:Integer}
+function Schur(
+  x::Union{Vector{T},Vector{Vector{I}}},
+  lambda::Vector{I}
+) where {T<:Number,I<:Integer}
   if !isPartition(lambda)
     error("`lambda` must be a partition of an integer")
   end
+  if eltype(x) == Vector{I}
+    x = map((pq) -> pq[1] // pq[2], x)
+  end
+  xType = eltype(x)
   function sch(m::Int64, k::Int64, nu::Vector{I})
     if isempty(nu) || nu[1] == 0 || m == 0
-      return T(1)
+      return xType(1)
     end
     if length(nu) > m && nu[m+1] > 0
-      return T(0)
+      return xType(0)
     end
     if m == 1
       return x[1]^nu[1]
@@ -390,7 +414,7 @@ function Schur(x::Vector{T}, lambda::Vector{I}) where {T<:Number,I<:Integer}
     return s
   end # end sch --------------------------------------------------------------
   lx = length(x)
-  S = Array{Union{Missing,T}}(missing, _N(lambda, lambda), lx)
+  S = Array{Union{Missing,xType}}(missing, _N(lambda, lambda), lx)
   sch(lx, 1, lambda)
 end
 

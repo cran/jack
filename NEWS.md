@@ -1,3 +1,12 @@
+# Version 3.0.0 (2022-02-21)
+
+- Now one can use a `bigq` number for `alpha` in `JackPol`, thanks to the 
+'gmpoly' package, and one can use `exact=TRUE` with `algorithm=DK` for 
+`ZonalPol`, `ZonalQPol` and `SchurPol`.
+
+- Now one can get a `gmpoly` polynomial with Julia. 
+
+
 # Version 2.0.0 (2022-02-14)
 
 - New function `Jack_julia`, to evaluate the polynomials with Julia.
