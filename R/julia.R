@@ -142,13 +142,12 @@ asIntegerList <- function(lambda){
 #' @return A list of functions having the same names as the R functions of this
 #'   package (\code{Jack}, \code{JackPol}, \code{Schur}, etc). The
 #'   \code{XXXPol} functions have an argument \code{poly}, whose possible
-#'   value is \code{"mvp"} (default) or \code{"gmpoly"}, and this is the
-#'   class of the polynomial returned by these functions. See the examples
-#'   and the \href{https://github.com/stla/jackR#readme}{README} file.
+#'   value is \code{"mvp"} or \code{"qspray"} (default), and this is the
+#'   class of the polynomial returned by these functions.
 #'
 #' @importFrom JuliaConnectoR juliaSetupOk juliaCall juliaImport juliaGet juliaEval
 #' @importFrom mvp mvp print.mvp
-#' @importFrom gmpoly gmpoly
+#' @importFrom qspray qsprayMaker
 #' @importFrom gmp as.bigq
 #'
 #' @export
@@ -167,11 +166,10 @@ asIntegerList <- function(lambda){
 #'   # to pass rational numbers, use strings:
 #'   julia$Jack(x = c("2", "2/3"), lambda = c(3, 1), alpha = "3/2")
 #'   # symbolic polynomials ####
-#'   # for `JackPol`, you can pass a rational `alpha` as a string:
+#'   # for `JackPol`, you must pass a rational `alpha` as a string if
+#'   # you want an exact polynomial:
 #'   ( pol <- julia$JackPol(m = 2, lambda = c(3, 1), alpha = "3/2") )
 #'   class(pol)
-#'   # you _must_ give `alpha` as a string if you choose `poly = "gmpoly"`
-#'   julia$JackPol(m = 2, lambda = c(3, 1), alpha = "3/2", poly = "gmpoly")
 #'   JuliaConnectoR::stopJulia()
 #' }}
 Jack_julia <- function(){
@@ -220,8 +218,8 @@ Jack_julia <- function(){
     }
     result
   }
-  JackPol <- function(m, lambda, alpha, poly = "mvp"){
-    poly <- match.arg(poly, c("mvp", "gmpoly"))
+  JackPol <- function(m, lambda, alpha, poly = "qspray"){
+    poly <- match.arg(poly, c("mvp", "qspray"))
     rational <- FALSE
     if(is.character(alpha)){
       if(!grepl("^\\d+/\\d+$", alpha)){
@@ -233,9 +231,9 @@ Jack_julia <- function(){
       alpha <- as.integer(strsplit(alpha, "/")[[1L]])
       rational <- TRUE
     }else{
-      if(poly == "gmpoly"){
+      if(poly == "qspray"){
         stop(
-          "If you want a `gmpoly` polynomial, you have ",
+          "If you want a `qspray` polynomial, you have ",
           "to supply a rational `alpha`; ",
           "it must be a character string of the form `p/q`."
         )
@@ -265,12 +263,11 @@ Jack_julia <- function(){
         attr(poly, "nvars") <- m
         class(poly) <- c("exactmvp", class(poly))
       }
-    }else{ # gmpoly
-      powers <- do.call(rbind, J[["powers"]])
+    }else{ # qspray
       coeffs <- vapply(J[["qcoefficients"]], function(f){
         paste0(f[["num"]], "/", f[["den"]])
       }, character(1L))
-      poly <- gmpoly(coeffs = as.bigq(coeffs), powers = powers)
+      poly <- qsprayMaker(coeffs = coeffs, powers = J[["powers"]])
     }
     poly
   }
@@ -288,7 +285,7 @@ Jack_julia <- function(){
     result
   }
   ZonalPol <- function(m, lambda, poly = "mvp"){
-    poly <- match.arg(poly, c("mvp", "gmpoly"))
+    poly <- match.arg(poly, c("mvp", "qspray"))
     J <- juliaGet(JackPolynomials$ZonalPolynomial(
       unname(as.integer(m)), asIntegerList(lambda)
     ))
@@ -310,12 +307,11 @@ Jack_julia <- function(){
         rationalPolynomial(powers, coeffs, stars = TRUE)
       attr(poly, "nvars") <- m
       class(poly) <- c("exactmvp", class(poly))
-    }else{ # gmpoly
-      powers <- do.call(rbind, J[["powers"]])
+    }else{ # qspray
       coeffs <- vapply(J[["qcoefficients"]], function(f){
         paste0(f[["num"]], "/", f[["den"]])
       }, character(1L))
-      poly <- gmpoly(coeffs = as.bigq(coeffs), powers = powers)
+      poly <- qsprayMaker(coeffs = coeffs, powers = J[["powers"]])
     }
     poly
   }
@@ -333,7 +329,7 @@ Jack_julia <- function(){
     result
   }
   ZonalQPol <- function(m, lambda, poly = "mvp"){
-    poly <- match.arg(poly, c("mvp", "gmpoly"))
+    poly <- match.arg(poly, c("mvp", "qspray"))
     J <- juliaGet(JackPolynomials$ZonalQPolynomial(
       unname(as.integer(m)), asIntegerList(lambda)
     ))
@@ -355,12 +351,11 @@ Jack_julia <- function(){
         rationalPolynomial(powers, coeffs, stars = TRUE)
       attr(poly, "nvars") <- m
       class(poly) <- c("exactmvp", class(poly))
-    }else{ # gmpoly
-      powers <- do.call(rbind, J[["powers"]])
+    }else{ # qspray
       coeffs <- vapply(J[["qcoefficients"]], function(f){
         paste0(f[["num"]], "/", f[["den"]])
       }, character(1L))
-      poly <- gmpoly(coeffs = as.bigq(coeffs), powers = powers)
+      poly <- qsprayMaker(coeffs = coeffs, powers = J[["powers"]])
     }
     poly
   }
@@ -378,7 +373,7 @@ Jack_julia <- function(){
     result
   }
   SchurPol <- function(m, lambda, poly = "mvp"){
-    poly <- match.arg(poly, c("mvp", "gmpoly"))
+    poly <- match.arg(poly, c("mvp", "qspray"))
     J <- juliaGet(JackPolynomials$SchurPolynomial(
       unname(as.integer(m)), asIntegerList(lambda)
     ))
@@ -393,10 +388,9 @@ Jack_julia <- function(){
         rationalPolynomial(powers, coeffs, stars = TRUE)
       attr(poly, "nvars") <- m
       class(poly) <- c("exactmvp", class(poly))
-    }else{ # gmpoly
-      powers <- do.call(rbind, J[["powers"]])
-      coeffs <- unlist(J[["coefficients"]])
-      poly <- gmpoly(coeffs = as.bigq(coeffs), powers = powers)
+    }else{ # qspray
+      coeffs <- J[["coefficients"]]
+      poly <- qsprayMaker(coeffs = coeffs, powers = J[["powers"]])
     }
     poly
   }
@@ -429,7 +423,7 @@ Jack_julia <- function(){
 #' @examples library(jack)
 #' \donttest{if(JuliaConnectoR::juliaSetupOk()){
 #'   julia <- Jack_julia()
-#'   ( pol <- julia$ZonalPol(m = 2, lambda = c(3, 1)) )
+#'   ( pol <- julia$ZonalPol(m = 2, lambda = c(3, 1), poly = "mvp") )
 #'   prettyForm(pol)
 #'   JuliaConnectoR::stopJulia()
 #' }}
@@ -463,7 +457,7 @@ prettyForm <- function(poly, asCharacter = FALSE){
 #' @examples library(jack)
 #' \donttest{if(JuliaConnectoR::juliaSetupOk()){
 #'   julia <- Jack_julia()
-#'   ( pol <- julia$ZonalQPol(m = 2, lambda = c(3, 2)) )
+#'   ( pol <- julia$ZonalQPol(m = 2, lambda = c(3, 2), poly = "mvp") )
 #'   toLaTeX(pol)
 #'   JuliaConnectoR::stopJulia()
 #' }}

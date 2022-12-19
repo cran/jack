@@ -3,13 +3,90 @@ The ‘jack’ package: Jack polynomials
 
 <!-- badges: start -->
 
-[![R-CMD-check](https://github.com/stla/jackR/workflows/R-CMD-check/badge.svg)](https://github.com/stla/jackR/actions)
+[![R-CMD-check](https://github.com/stla/jackR/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/stla/jackR/actions/workflows/R-CMD-check.yaml)
 <!-- badges: end -->
 
 ``` r
 library(jack)
 library(microbenchmark)
 ```
+
+Schur polynomials have applications in combinatorics and zonal
+polynomials have applications in multivariate statistics. They are
+particular cases of [Jack
+polynomials](https://en.wikipedia.org/wiki/Jack_function). This package
+allows to evaluate these polynomials. It can also compute their symbolic
+form.
+
+The functions `JackPol`, `ZonalPol`, `ZonalQPol` and `SchurPol`
+respectively return the Jack polynomial, the zonal polynomial, the
+quaternionic zonal polynomial, and the Schur polynomial.
+
+Each of these polynomials corresponds is given by a positive integer,
+the number of variables, and an integer partition, the `lambda`
+argument; the Jack polynomial has one more parameter, the `alpha`
+argument, a positive number.
+
+To get an exact symbolic polynomial with `JackPol`, you have to supply a
+`bigq` rational number for the parameter `alpha`:
+
+``` r
+jpol <- JackPol(2, lambda = c(3, 1), alpha = gmp::as.bigq("2/5"))
+jpol
+## 98/25*x^(3, 1) + 98/25*x^(1, 3) + 28/5*x^(2, 2)
+```
+
+This is a `qspray` object, from the
+[**qspray**](https://github.com/stla/qspray) package. Here is how you
+can evaluate this polynomial:
+
+``` r
+qspray::evalQspray(jpol, c("2", "3/2"))
+## Big Rational ('bigq') :
+## [1] 1239/10
+```
+
+By default, `ZonalPol`, `ZonalQPol` and `SchurPol` return exact symbolic
+polynomials.
+
+``` r
+zpol <- ZonalPol(2, lambda = c(3, 1))
+zpol
+## 24/7*x^(3, 1) + 24/7*x^(1, 3) + 16/7*x^(2, 2)
+```
+
+It is also possible to convert a `qspray` polynomial to a function whose
+evaluation is performed by the **Ryacas** package:
+
+``` r
+zyacas <- as.function(zpol)
+```
+
+You can provide the values of the variables of this function as numbers
+or character strings:
+
+``` r
+zyacas(2, "3/2")
+## [1] "594/7"
+```
+
+You can even pass a variable name to this function:
+
+``` r
+zyacas("x", "x")
+## [1] "(64*x^4)/7"
+```
+
+If you want to substitute a variable with a complex number, use a
+character string which represents this number, with `I` denoting the
+imaginary unit:
+
+``` r
+zyacas("2 + 2*I", "2/3")
+## [1] "Complex((-2176)/63,2944/63)"
+```
+
+## Jack polynomials with Julia
 
 As of version 2.0.0, the Jack polynomials can be calculated with Julia.
 The speed is amazing:
@@ -30,9 +107,9 @@ print(
   signif = 6L
 )
 ## Unit: seconds
-##   expr        min         lq      mean    median         uq      max neval
-##      R 15.2136000 15.4525000 15.848700 15.618300 15.9377000 17.25190     6
-##  Julia  0.0092488  0.0096234  0.448923  0.013536  0.0171231  2.63047     6
+##   expr        min        lq     mean    median        uq     max neval cld
+##      R 7.73008000 7.8626500 7.903070 7.9140600 7.9534400 8.04412     6   b
+##  Julia 0.00338613 0.0459389 0.216757 0.0697467 0.0948473 1.01688     6  a
 ```
 
 `Jack_julia()` returns a list of functions. `ZonalPol`, `ZonalQPol` and
@@ -44,89 +121,7 @@ for the argument `alpha`, as a character string:
 ``` r
 JP <- julia$JackPol(m = 2, lambda = c(3, 1), alpha = "2/5")
 JP
-## mvp object algebraically equal to
-## 3.92 x_1 x_2^3  +  5.6 x_1^2 x_2^2  +  3.92 x_1^3 x_2
-## 
-## Exact expression:
-## 98/25 * x1^3 * x2  +  28/5 * x1^2 * x2^2  +  98/25 * x1 * x2^3
-```
-
-To evaluate a polynomial, use `as.function`:
-
-``` r
-jp <- as.function(JP)
-```
-
-You can provide the values of the variables of this function as numbers
-or character strings:
-
-``` r
-jp(2, "3/2")
-## [1] "1239/10"
-```
-
-You can even pass a variable name to this function:
-
-``` r
-jp("x", "x")
-## [1] "(336*x^4)/25"
-```
-
-This evaluation is performed by the **Ryacas** package. If you want to
-substitute a variable with a complex number, use a character string
-which represents this number, with `I` denoting the imaginary unit:
-
-``` r
-jp("2 + 2*I", "2/3")
-## [1] "Complex((-26656)/675,43232/675)"
-```
-
-Two functions are provided to print the polynomials with an exact
-expression:
-
-``` r
-prettyForm(JP)
-## 
-##        3               2     2               3
-## 98 * x1  * x2   28 * x1  * x2    98 * x1 * x2 
-## ------------- + -------------- + -------------
-##      25               5               25
-```
-
-``` r
-toLaTeX(JP)
-## $\frac{98 x_{1}^{3} x_{2}}{25}  + \frac{28 x_{1}^{2} x_{2}^{2}}{5}  + \frac{98 x_{1} x_{2}^{3}}{25} $
-```
-
-You can also use the functions `JackPol`, `ZonalPol`, `ZonalQPol` and
-`SchurPol` without passing by `Jack_julia()`. They are implemented in R.
-To get an exact symbolic polynomial with `JackPol`, you have to supply a
-`bigq` rational number for the parameter `alpha`:
-
-``` r
-jpol <- JackPol(2, lambda = c(3, 1), alpha = gmp::as.bigq("2/5"))
-jpol
-## gmpoly object algebraically equal to
-## 98/25 x^(1,3) + 28/5 x^(2,2) + 98/25 x^(3,1)
-```
-
-This is a `gmpoly` object, from the
-[gmpoly](https://github.com/stla/gmpoly) package.
-
-``` r
-gmpoly::gmpolyEval(jpol, c(gmp::as.bigq("2"), gmp::as.bigq("3/2")))
-## Big Rational ('bigq') :
-## [1] 1239/10
-```
-
-By default, `ZonalPol`, `ZonalQPol` and `SchurPol` return exact symbolic
-polynomials.
-
-``` r
-zpol <- ZonalPol(2, lambda = c(3, 1))
-zpol
-## gmpoly object algebraically equal to
-## 24/7 x^(1,3) + 16/7 x^(2,2) + 24/7 x^(3,1)
+## 98/25*x^(1, 3) + 28/5*x^(2, 2) + 98/25*x^(3, 1)
 ```
 
 Again, Julia is faster:
@@ -141,33 +136,12 @@ microbenchmark(
   Julia = julia$JackPol(n, lambda, alpha),
   times = 6L
 )
-## Unit: seconds
-##   expr      min       lq     mean   median       uq      max neval
-##      R 5.796784 5.969351 6.534679 6.384724 6.501181 8.171313     6
-##  Julia 2.314522 2.425651 2.521455 2.488385 2.544755 2.867033     6
-```
-
-As of version 3.0.0, one can also get a `gmpoly` polynomial with Julia,
-by setting the argument `poly` to `"gmpoly"` in the `XXXPol` functions
-in the list returned by `Jack_julia`:
-
-``` r
-julia$JackPol(2, lambda = c(3, 1), alpha = "2/5", poly = "gmpoly")
-## gmpoly object algebraically equal to
-## 98/25 x^(1,3) + 28/5 x^(2,2) + 98/25 x^(3,1)
-```
-
-``` r
-n <- 5
-lambda <- c(4, 3, 3)
-alpha <- "2/3"
-microbenchmark(
-     Julia_mvp = julia$JackPol(n, lambda, alpha),
-  Julia_gmpoly = julia$JackPol(n, lambda, alpha, poly = "gmpoly"),
-  times = 6L
-)
 ## Unit: milliseconds
-##          expr       min        lq      mean    median       uq      max neval
-##     Julia_mvp 2356.3070 2374.6200 2416.4645 2385.8910 2460.117 2535.961     6
-##  Julia_gmpoly  819.8618  885.6438  927.5658  890.9213  925.444 1152.603     6
+##   expr       min        lq      mean    median        uq       max neval cld
+##      R 1170.8920 1188.7068 1225.4087 1211.0391 1236.0073 1334.7680     6   b
+##  Julia  464.3045  491.7447  549.3006  496.9847  546.5387  799.2461     6  a
+```
+
+``` r
+JuliaConnectoR::stopJulia()
 ```
