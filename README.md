@@ -4,6 +4,7 @@ The ‘jack’ package: Jack polynomials
 <!-- badges: start -->
 
 [![R-CMD-check](https://github.com/stla/jackR/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/stla/jackR/actions/workflows/R-CMD-check.yaml)
+[![R-CMD-check-valgrind](https://github.com/stla/jackR/actions/workflows/R-CMD-check-valgrind.yaml/badge.svg)](https://github.com/stla/jackR/actions/workflows/R-CMD-check-valgrind.yaml)
 <!-- badges: end -->
 
 ``` r
@@ -107,9 +108,9 @@ print(
   signif = 6L
 )
 ## Unit: seconds
-##   expr        min        lq     mean    median        uq     max neval cld
-##      R 7.73008000 7.8626500 7.903070 7.9140600 7.9534400 8.04412     6   b
-##  Julia 0.00338613 0.0459389 0.216757 0.0697467 0.0948473 1.01688     6  a
+##   expr       min       lq     mean    median        uq      max neval cld
+##      R 6.4788000 6.510730 6.611840 6.6362300 6.6511900 6.757840     6   b
+##  Julia 0.0486632 0.049609 0.215498 0.0555616 0.0898553 0.993737     6  a
 ```
 
 `Jack_julia()` returns a list of functions. `ZonalPol`, `ZonalQPol` and
@@ -131,15 +132,57 @@ n <- 5
 lambda <- c(4, 3, 3)
 alpha <- "2/3"
 alphaq <- gmp::as.bigq(alpha)
-microbenchmark(
-      R = JackPol(n, lambda, alphaq),
-  Julia = julia$JackPol(n, lambda, alpha),
-  times = 6L
-)
+print(
+  microbenchmark(
+        R = JackPol(n, lambda, alphaq),
+    Julia = julia$JackPol(n, lambda, alpha),
+    times = 6L
+  ),
+signif = 2L)
 ## Unit: milliseconds
-##   expr       min        lq      mean    median        uq       max neval cld
-##      R 1170.8920 1188.7068 1225.4087 1211.0391 1236.0073 1334.7680     6   b
-##  Julia  464.3045  491.7447  549.3006  496.9847  546.5387  799.2461     6  a
+##   expr min  lq mean median  uq  max neval cld
+##      R 960 960  980    970 970 1100     6   b
+##  Julia 460 470  530    520 560  680     6  a
+```
+
+## ‘Rcpp’ implementation of the polynomials
+
+As of version 5.0.0, a ‘Rcpp’ implementation of the polynomials is
+provided by the package. It is faster than Julia (though I didn’t
+compare in pure Julia - the Julia execution time is slowed down by the
+‘JuliaConnectoR’ package):
+
+``` r
+n <- 5
+lambda <- c(4, 3, 3, 2)
+print(
+  microbenchmark(
+     Rcpp = SchurPolCPP(n, lambda),
+    Julia = julia$SchurPol(n, lambda),
+    times = 6L
+  ), 
+signif = 2L)
+## Unit: milliseconds
+##   expr   min    lq mean median    uq    max neval cld
+##   Rcpp   5.8   5.9    6      6   6.1    6.3     6  a 
+##  Julia 530.0 530.0  640    530 540.0 1200.0     6   b
+```
+
+``` r
+n <- 5
+lambda <- c(4, 3, 3, 2)
+alpha <- "2/3"
+print(
+  microbenchmark(
+     Rcpp = JackPolCPP(n, lambda, alpha),
+    Julia = julia$JackPol(n, lambda, alpha),
+    times = 6L
+  ), 
+signif = 2L)
+## Unit: milliseconds
+##   expr min  lq mean median  uq max neval cld
+##   Rcpp  23  23   24     24  26  27     6  a 
+##  Julia 360 360  420    420 470 500     6   b
 ```
 
 ``` r

@@ -1,8 +1,8 @@
 Type: Package
 Package: jack
 Title: Jack, Zonal, and Schur Polynomials
-Version: 4.0.0
-Date: 2022-12-19
+Version: 5.0.0
+Date: 2023-01-27
 Author: Stéphane Laurent
 Maintainer: Stéphane Laurent <laurent_step@outlook.fr>
 Description: Symbolic calculation and evaluation of the Jack polynomials,
@@ -14,12 +14,14 @@ Description: Symbolic calculation and evaluation of the Jack polynomials,
 License: GPL-3
 URL: https://github.com/stla/jackR
 BugReports: https://github.com/stla/jackR/issues
+SystemRequirements: C++ 20, gmp
 Imports: DescTools, gmp, JuliaConnectoR, multicool, mvp, partitions,
-        qspray, Ryacas, spray
+        qspray, Rcpp, Ryacas, spray
+LinkingTo: BH, Rcpp
 Suggests: testthat
 Encoding: UTF-8
 RoxygenNote: 7.2.3
-NeedsCompilation: no
-Packaged: 2022-12-19 13:39:37 UTC; stla
+NeedsCompilation: yes
+Packaged: 2023-01-28 09:33:07 UTC; stla
 Repository: CRAN
-Date/Publication: 2022-12-19 14:00:02 UTC
+Date/Publication: 2023-01-28 10:00:02 UTC
