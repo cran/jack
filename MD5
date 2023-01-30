@@ -1,6 +1,6 @@
-dd03e2fb18144eacf8b69acfae430cc1 *DESCRIPTION
+8579df01cdc9f6d442a81a552de1ec13 *DESCRIPTION
 0d6201b76edbb7b1d8c3e9832ca499e7 *NAMESPACE
-e941a5e26f9d99ab16ff9129f06dd1e9 *NEWS.md
+096b18e12820890fe6149a045b3646e4 *NEWS.md
 142c2c1ecb86e42eaa74193860309f45 *R/CPP.R
 4d5052a784e7c853d60c7b54cf0e6395 *R/CoefficientsJack.R
 e7be5591ce7eb3cfd262cb37e6d0a7af *R/CoefficientsSchur.R
@@ -46,10 +46,10 @@ b44abd3fbfece4fbc9373480ed1bb83e *man/as.function.exactmvp.Rd
 eabd2af7e09d2ad2bde19390b40006bc *man/prettyForm.Rd
 c75f6fa6886a09b2bff6c8e0cba13d45 *man/print.exactmvp.Rd
 230608912f98632211a4f869fd396032 *man/toLaTeX.Rd
-f0aeeb4fc15af6649271825137853039 *src/Makevars.in
-b9fd04ed51273ea37509cf720784fc7c *src/Makevars.win
+70cfe72ff54b4c38e72518384a28ebba *src/Makevars.in
+8f5b3ea08d156ff2e86787583396a8b0 *src/Makevars.win
 705f0efbf1f78c21c5b2159597f8c33d *src/RcppExports.cpp
-cb245ab3196ab69f25e72d63155f9283 *src/jack.cpp
+446efe5bea65f915739e2d0595952e47 *src/jack.cpp
 1b16b9f6d6562e03e79f6c6c388df677 *tests/testthat.R
 91c3fb7e6789011a73c946ce48b56015 *tests/testthat/helper-00.R
 093c29fe446cc4f72d3fc0f516abf29c *tests/testthat/test-jack.R
