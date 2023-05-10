@@ -105,12 +105,12 @@ print(
     times = 6L,
     unit  = "seconds"
   ),
-  signif = 6L
+  signif = 2L
 )
 ## Unit: seconds
-##   expr       min       lq     mean    median        uq      max neval cld
-##      R 6.4788000 6.510730 6.611840 6.6362300 6.6511900 6.757840     6   b
-##  Julia 0.0486632 0.049609 0.215498 0.0555616 0.0898553 0.993737     6  a
+##   expr   min   lq mean median    uq  max neval
+##      R 6.800 6.90 6.90  6.900 6.900 7.00     6
+##  Julia 0.046 0.05 0.21  0.076 0.096 0.93     6
 ```
 
 `Jack_julia()` returns a list of functions. `ZonalPol`, `ZonalQPol` and
@@ -140,9 +140,9 @@ print(
   ),
 signif = 2L)
 ## Unit: milliseconds
-##   expr min  lq mean median  uq  max neval cld
-##      R 960 960  980    970 970 1100     6   b
-##  Julia 460 470  530    520 560  680     6  a
+##   expr min  lq mean median   uq  max neval
+##      R 980 980 1000    990 1000 1100     6
+##  Julia 470 500  540    510  510  720     6
 ```
 
 ## ‘Rcpp’ implementation of the polynomials
@@ -163,9 +163,9 @@ print(
   ), 
 signif = 2L)
 ## Unit: milliseconds
-##   expr   min    lq mean median    uq    max neval cld
-##   Rcpp   5.8   5.9    6      6   6.1    6.3     6  a 
-##  Julia 530.0 530.0  640    530 540.0 1200.0     6   b
+##   expr   min    lq  mean median    uq    max neval
+##   Rcpp   6.2   6.4   6.6    6.5   6.6    7.3     6
+##  Julia 530.0 530.0 640.0  540.0 540.0 1200.0     6
 ```
 
 ``` r
@@ -180,9 +180,33 @@ print(
   ), 
 signif = 2L)
 ## Unit: milliseconds
-##   expr min  lq mean median  uq max neval cld
-##   Rcpp  23  23   24     24  26  27     6  a 
-##  Julia 360 360  420    420 470 500     6   b
+##   expr min  lq mean median  uq max neval
+##   Rcpp  24  24   25     25  25  25     6
+##  Julia 370 410  430    420 470 500     6
+```
+
+As of version 5.1.0, there’s also a ‘Rcpp’ implementation of the
+evaluation of the polynomials.
+
+``` r
+x <- c("1/2", "2/3", "1", "2/3", "1", "5/4")
+lambda <- c(5, 3, 2, 2, 1)
+alpha <- "3"
+print(
+  microbenchmark(
+        R = Jack(gmp::as.bigq(x), lambda, gmp::as.bigq(alpha)),
+     Rcpp = JackCPP(x, lambda, alpha),
+    Julia = julia$Jack(x, lambda, alpha),
+    times = 6L,
+    unit  = "seconds"
+  ),
+  signif = 2L
+)
+## Unit: seconds
+##   expr   min    lq  mean median    uq   max neval
+##      R 16.00 16.00 16.00  16.00 16.00 17.00     6
+##   Rcpp  0.15  0.16  0.16   0.16  0.17  0.17     6
+##  Julia  0.31  0.33  0.42   0.39  0.42  0.66     6
 ```
 
 ``` r
