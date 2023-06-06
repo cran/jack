@@ -9,12 +9,20 @@ JackPolRcpp <- function(n, lambda, alpha) {
     .Call(`_jack_JackPolRcpp`, n, lambda, alpha)
 }
 
-JackEvalRcpp <- function(x, lambda, alpha) {
-    .Call(`_jack_JackEvalRcpp`, x, lambda, alpha)
+JackEvalRcpp_gmpq <- function(x, lambda, alpha) {
+    .Call(`_jack_JackEvalRcpp_gmpq`, x, lambda, alpha)
 }
 
-SchurEvalRcpp <- function(x, lambda) {
-    .Call(`_jack_SchurEvalRcpp`, x, lambda)
+JackEvalRcpp_double <- function(x, lambda, alpha) {
+    .Call(`_jack_JackEvalRcpp_double`, x, lambda, alpha)
+}
+
+SchurEvalRcpp_gmpq <- function(x, lambda) {
+    .Call(`_jack_SchurEvalRcpp_gmpq`, x, lambda)
+}
+
+SchurEvalRcpp_double <- function(x, lambda) {
+    .Call(`_jack_SchurEvalRcpp_double`, x, lambda)
 }
 
 test <- function() {
