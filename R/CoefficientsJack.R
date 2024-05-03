@@ -20,7 +20,7 @@ JackCoefficientsQ <- function(n, alpha, until = NULL){
   coefs <- as.bigq(integer(lastRow*nParts))
   coefs[1L] <- as.bigq(1L)
   for(m in 1L:min(lastRow, nParts-1L)){
-    kappa <- allParts[,m]
+    kappa <- allParts[, m]
     for(k in (m+1L):nParts){
       lambda <- allParts[,k]
       btwn <- betweenPartitions(lambda, kappa)
@@ -34,7 +34,7 @@ JackCoefficientsQ <- function(n, alpha, until = NULL){
             muOrd <- sort(asNumeric(mu), decreasing = TRUE)
             if(isDominated(muOrd, kappa)){
               x <- x + (mu[i]-mu[j]) /
-                (.e(kappa, alpha)-.e(lambda, alpha)) *
+                (.e(kappa, alpha) - .e(lambda, alpha)) *
                 coefs[indices[m, toString(muOrd)]]
             }
           }

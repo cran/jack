@@ -2,19 +2,18 @@
 #'
 #' Evaluates a Jack polynomial.
 #'
-#' @param x numeric or complex vector or \link[gmp]{bigq} vector
+#' @param x numeric or complex vector or \code{\link[gmp]{bigq}} vector
 #' @param lambda an integer partition, given as a vector of decreasing
 #' integers
-#' @param alpha positive number or \code{bigq} rational number
+#' @param alpha ordinary number or \code{bigq} rational number
 #' @param algorithm the algorithm used, either \code{"DK"} (Demmel-Koev)
 #' or \code{"naive"}
 #'
 #' @return A numeric or complex scalar or a \code{bigq} rational number.
 #' @export
-#' @importFrom partitions conjugate
 #' @importFrom gmp factorialZ is.bigq as.bigq
 #'
-#' @seealso \code{\link{JackPol}}
+#' @seealso \code{\link{JackPolR}}
 #'
 #' @references \itemize{
 #' \item I.G. Macdonald.
@@ -30,32 +29,33 @@
 #' }
 #'
 #' @examples lambda <- c(2,1,1)
-#' Jack(c(1/2, 2/3, 1), lambda, alpha = 3)
+#' JackR(c(1/2, 2/3, 1), lambda, alpha = 3)
 #' # exact value:
-#' Jack(c(gmp::as.bigq(1,2), gmp::as.bigq(2,3), gmp::as.bigq(1)), lambda,
+#' JackR(c(gmp::as.bigq(1,2), gmp::as.bigq(2,3), gmp::as.bigq(1)), lambda,
 #'      alpha = gmp::as.bigq(3))
-Jack <- function(x, lambda, alpha, algorithm = "DK"){
+JackR <- function(x, lambda, alpha, algorithm = "DK"){
   stopifnot(
     is.vector(x) || is.bigq(x),
     is.numeric(x) || is.complex(x) || is.bigq(x),
     is.numeric(alpha) || is.bigq(alpha),
     length(alpha) == 1L
   )
+  stopifnot(isPartition(lambda))
+  lambda <- lambda[lambda != 0]
   if(alpha == 0){
-    stopifnot(isPartition(lambda))
     gmp <- is.bigq(x)
-    if(length(lambda) == 0L || lambda[1L] == 0L){
+    if(length(lambda) == 0L){
       if(gmp){
         return(as.bigq(1L))
       }else{
         return(1)
       }
     }
-    lambdaPrime <- conjugate(lambda)
+    lambdaPrime <- dualPartition(lambda)
     if(gmp){
-      f <- as.bigq(prod(factorialZ(lambdaPrime[lambdaPrime>0L])))
+      f <- as.bigq(prod(factorialZ(lambdaPrime)))
     }else{
-      f <- prod(factorial(lambdaPrime[lambdaPrime>0L]))
+      f <- prod(factorial(lambdaPrime))
     }
     return(f * ESF(x, lambdaPrime))
   }

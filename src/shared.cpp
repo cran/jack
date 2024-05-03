@@ -16,63 +16,6 @@ int _N(Partition lambda, Partition mu) {
 
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ //
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ //
-template <typename numT>
-numT _betaratio(Partition kappa, Partition mu, int k, numT alpha) {
-  std::vector<numT> muT;
-  std::vector<numT> kappaT;
-  std::vector<numT> s;
-  muT.reserve(k); kappaT.reserve(k); s.reserve(k);
-  for(int i = 0; i < k; i++) {
-    muT.emplace_back(numT(mu[i]));
-    kappaT.emplace_back(numT(kappa[i]));
-    s.emplace_back(numT(i+1));
-  }
-  numT oneT(1);
-  numT t = s[k-1] - alpha * muT[k-1];
-  std::vector<numT> u;
-  u.reserve(k);
-  for(int i = 0; i < k; i++) {
-    u.emplace_back(t + oneT - s[i] + alpha * kappaT[i]);
-  }
-  std::vector<numT> v;
-  v.reserve(k-1);
-  for(int i = 0; i < k-1; i++) {
-    v.emplace_back(t - s[i] + alpha * muT[i]);
-  }
-  int musize = mu.size();
-  int muk = mu[k-1];
-  std::vector<numT> w;
-  w.reserve(muk-1);
-  numT al(0);
-  for(int i = 1; i < muk; i++) {
-    int j = 0;
-    while(j < musize && mu[j] >= i) {
-      j++;
-    }
-    al += alpha;
-    w.emplace_back(numT(j) - t - al);
-  }
-  numT prod1(1);
-  numT prod2(1);
-  numT prod3(1);
-  for(int i = 0; i < k; i++) {
-    prod1 *= (u[i] / (u[i] + alpha - oneT));
-  }
-  for(int i = 0; i < k-1; i++) {
-    prod2 *= (oneT + alpha / v[i]);
-  }
-  for(int i = 0; i < muk-1; i++) {
-    prod3 *= (oneT + alpha / w[i]);
-  }
-  return alpha * prod1 * prod2 * prod3;
-}
-
-template gmpq _betaratio<gmpq>(Partition, Partition, int, gmpq);
-template double _betaratio<double>(Partition, Partition, int, double);
-
-
-// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ //
-// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ //
 int weight(Partition mu) {
   int w = 0;
   int musize = mu.size();
@@ -81,3 +24,75 @@ int weight(Partition mu) {
   }
   return w;
 }
+
+
+// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ //
+// ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ //
+template <typename T> // alpha = number or Qlone(1)/1
+std::pair<T,T> _betaPQ(Partition kappa, Partition mu, int k, T alpha) {
+  T t = T(k) - T(mu[k-1]) * alpha;
+  std::vector<T> u;
+  u.reserve(k);
+  for(int i = 0; i < k; i++) {
+    u.emplace_back(t - T(i) + T(kappa[i])*alpha);
+  }
+  std::vector<T> v;
+  v.reserve(k-1);
+  for(int i = 0; i < k-1; i++) {
+    v.emplace_back(t - T(i+1) + T(mu[i])*alpha);
+  }
+  int musize = mu.size();
+  int muk = mu[k-1];
+  std::vector<T> w;
+  w.reserve(muk-1);
+  T al(0);
+  for(int i = 1; i < muk; i++) {
+    int j = 0;  // dual partition
+    while(j < musize && mu[j] >= i) {
+      j++;
+    }
+    al += alpha;
+    w.emplace_back(T(j) - t - al);
+  }
+  T num1(1);
+  T den1(1);
+  T num2(1);
+  T den2(1);
+  T num3(1);
+  T den3(1);
+  for(int i = 0; i < k; i++) {
+    num1 *= u[i];
+    den1 *= u[i] + alpha - T(1);
+  }
+  for(int i = 0; i < k-1; i++) {
+    num2 *= v[i] + alpha;
+    den2 *= v[i];
+  }
+  for(int i = 0; i < muk-1; i++) {
+    num3 *= w[i] + alpha;
+    den3 *= w[i];
+  }
+  return std::pair<T,T>(alpha*num1*num2*num3, den1*den2*den3);
+}
+
+template <typename T>
+T _betaratio(Partition kappa, Partition mu, int k, T alpha) {
+  std::pair<T,T> PQ = _betaPQ<T>(kappa, mu, k, alpha);
+  return PQ.first / PQ.second;
+}
+
+template gmpq   _betaratio<gmpq>(Partition, Partition, int, gmpq);
+template double _betaratio<double>(Partition, Partition, int, double);
+
+template <typename T>
+RatioOfQsprays<T> _betaratio(Partition kappa, Partition mu, int k, RatioOfQsprays<T> alpha) {
+  Qspray<T> alphaNumerator = alpha.getNumerator(); // assuming denominator=1
+  std::pair<Qspray<T>,Qspray<T>> PQ = _betaPQ<Qspray<T>>(kappa, mu, k, alphaNumerator);
+  Qspray<T> P = PQ.first;
+  Qspray<T> Q = PQ.second;
+  RATIOOFQSPRAYS::utils::simplifyFraction(P, Q);
+  return RatioOfQsprays<T>(P, Q);
+}
+
+template RatioOfQsprays<gmpq> _betaratio<RatioOfQsprays<gmpq>>(Partition, Partition, int, RatioOfQsprays<gmpq>);
+

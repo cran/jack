@@ -3,6 +3,11 @@
 #' @importFrom utils tail
 NULL
 
+isInteger <- function(n){
+  is.vector(n) && is.numeric(n) &&
+    length(n) == 1L && !is.na(n) && as.integer(n) == n
+}
+
 isPositiveInteger <- function(n){
   is.vector(n) && is.numeric(n) && length(n) == 1L && !is.na(n) && floor(n) == n
 }
@@ -12,11 +17,12 @@ isPositiveInteger <- function(n){
 # }
 
 isPartition <- function(lambda){
-  length(lambda) == 0L || all(floor(lambda) == lambda) && all(diff(lambda) <= 0)
+  length(lambda) == 0L ||
+    all(floor(lambda) == lambda) && all(diff(lambda) <= 0)
 }
 
 dualPartition <- function(lambda){
-  if(all(lambda == 0)) 0 else conjugate(lambda)
+  conjugate(lambda)
 }
 
 logHookLengths <- function(lambda, alpha){
@@ -31,11 +37,82 @@ logHookLengths <- function(lambda, alpha){
 hookLengths_gmp <- function(lambda, alpha){
   i <- rep(seq_along(lambda), times = lambda)
   j <- unlist(sapply(lambda, seq_len, simplify = FALSE))
-  lambdaPrime <- as.bigq(dualPartition(lambda))
-  lambda <- as.bigq(lambda)
+  lambdaPrime <- dualPartition(lambda)
+  alpha <- as.bigq(alpha)
   upperHL <- lambdaPrime[j] - i + alpha*(lambda[i] - j + 1L)
   lowerHL <- lambdaPrime[j] - i + 1L + alpha*(lambda[i] - j)
-  c(upperHL, lowerHL)
+  rbind(lowerHL, upperHL)
+}
+
+#' @importFrom gmp factorialZ
+#' @noRd
+JackCcoefficient <- function(lambda, alpha) {
+  if(length(lambda) == 0L) {
+    as.bigq(1L)
+  } else {
+    k <- sum(lambda)
+    jlambda <- prod(hookLengths_gmp(lambda, alpha))
+    as.bigq(alpha)^k * factorialZ(k) / jlambda
+  }
+}
+
+JackPcoefficient <- function(lambda, alpha) {
+  if(length(lambda) == 0L){
+    as.bigq(1L)
+  } else {
+    1L / prod(hookLengths_gmp(lambda, alpha)[1L, ])
+  }
+}
+
+JackQcoefficient <- function(lambda, alpha) {
+  if(length(lambda) == 0L){
+    as.bigq(1L)
+  } else {
+    1L / prod(hookLengths_gmp(lambda, alpha)[2L, ])
+  }
+}
+
+#' @importFrom qspray qlone qone
+#' @noRd
+symbolicJackPcoefficientInverse <- function(lambda) {
+  if(length(lambda) == 0L) {
+    return(qone())
+  }
+  i <- rep(seq_along(lambda), times = lambda)
+  j <- unlist(sapply(lambda, seq_len, simplify = FALSE))
+  lambdaPrime <- as.bigq(dualPartition(lambda))
+  lambda <- as.bigq(lambda)
+  alpha <- qlone(1L)
+  out <- 1L
+  for(k in seq_along(i)) {
+    out <- out *
+      (lambdaPrime[j[k]] - i[k] + 1L + (lambda[i[k]] - j[k])*alpha)
+  }
+  out
+}
+symbolicJackQcoefficientInverse <- function(lambda){
+  if(length(lambda) == 0L) {
+    return(qone())
+  }
+  i <- rep(seq_along(lambda), times = lambda)
+  j <- unlist(sapply(lambda, seq_len, simplify = FALSE))
+  lambdaPrime <- as.bigq(dualPartition(lambda))
+  lambda <- as.bigq(lambda)
+  alpha <- qlone(1L)
+  out <- 1L
+  for(k in seq_along(i)) {
+    out <- out *
+      (lambdaPrime[j[k]] - i[k] + alpha*(lambda[i[k]] - j[k] + 1L))
+  }
+  out
+}
+
+symbolicJackCcoefficient <- function(lambda) {
+  k <- sum(lambda)
+  alpha <- qlone(1L)
+  jlambda <- symbolicJackPcoefficientInverse(lambda) *
+    symbolicJackQcoefficientInverse(lambda)
+  factorialZ(k) * alpha^k / jlambda
 }
 
 .Blog <- function(nu, lambda, mu, alpha){
@@ -105,7 +182,7 @@ hookLengths_gmp <- function(lambda, alpha){
 
 .N <- function(lambda, mu){
   n <- length(lambda)
-  M <- sapply(1L:n, function(i) prod(tail(lambda+1L,n-i)))
+  M <- sapply(1L:n, function(i) prod(tail(lambda+1L, n-i)))
   sum(mu * M)
 }
 
@@ -153,3 +230,26 @@ betweenPartitions <- function(mu, lambda){
     alpha * .n(dualPartition(lambda)) - .n(lambda)
   }
 }
+
+####
+#' @importFrom mvp mvp as.mvp
+#' @importFrom gmp asNumeric as.bigq
+#' @noRd
+as_mvp_spray <- function(s) {
+  if(length(s) == 0L) return(as.mvp(0))
+  powers <- s[["index"]]
+  m <- nrow(powers)
+  n <- ncol(powers)
+  vars <- replicate(m, paste0("x_", 1L:n), simplify = FALSE)
+  powers <- lapply(1L:m, function(i) powers[i, ])
+  mvp(vars, powers, s[["value"]])
+}
+
+as_mvp_qspray <- function(s) {
+  vars <- lapply(s@powers, function(exponents) paste0("x_", seq_along(exponents)))
+  mvp(vars, s@powers, asNumeric(as.bigq(s@coeffs)))
+}
+
+#' @importFrom qspray as.qspray
+#' @importFrom spray zero one lone
+NULL

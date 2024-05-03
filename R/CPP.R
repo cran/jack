@@ -9,22 +9,23 @@
 #' @return A \code{qspray} multivariate polynomial.
 #'
 #' @export
-#' @importFrom qspray qsprayMaker
+#' @importFrom qspray qspray_from_list
 #'
 #' @examples
-#' SchurPolCPP(3, lambda = c(3, 1))
-SchurPolCPP <- function(n, lambda) {
+#' ( schur <- SchurPol(3, lambda = c(3, 1)) )
+#' schur == JackPol(3, lambda = c(3, 1), alpha = "1", which = "P")
+SchurPol <- function(n, lambda) {
   stopifnot(isPositiveInteger(n), isPartition(lambda))
-  x <- SchurPolRcpp(as.integer(n), as.integer(lambda))
-  qsprayMaker(x[["exponents"]], x[["coeffs"]])
+  lambda <- as.integer(lambda[lambda != 0])
+  qspray_from_list(SchurPolRcpp(as.integer(n), lambda))
 }
 
 #' Evaluation of Schur polynomial - C++ implementation
 #'
 #' Evaluates the Schur polynomial.
 #'
-#' @param x variables, a vector of \code{bigq} numbers, or a vector that can
-#'   be coerced as such (e.g. \code{c("2", "5/3")})
+#' @param x values of the variables, a vector of \code{bigq} numbers, or a
+#'   vector that can be coerced as such (e.g. \code{c("2", "5/3")})
 #' @param lambda an integer partition, given as a vector of decreasing
 #'   integers
 #'
@@ -34,20 +35,21 @@ SchurPolCPP <- function(n, lambda) {
 #' @importFrom gmp as.bigq
 #'
 #' @examples
-#' SchurCPP(c("1", "3/2", "-2/3"), lambda = c(3, 1))
-SchurCPP <- function(x, lambda) {
+#' Schur(c("1", "3/2", "-2/3"), lambda = c(3, 1))
+Schur <- function(x, lambda) {
   stopifnot(isPartition(lambda))
+  lambda <- as.integer(lambda[lambda != 0])
   if(is.numeric(x)) {
     if(anyNA(x)) {
       stop("Found missing values in `x`.")
     }
-    SchurEvalRcpp_double(as.double(x), as.integer(lambda))
+    SchurEvalRcpp_double(as.double(x), lambda)
   } else {
     x <- as.character(as.bigq(x))
     if(anyNA(x)) {
       stop("Found missing values in `x`.")
     }
-    res <- SchurEvalRcpp_gmpq(x, as.integer(lambda))
+    res <- SchurEvalRcpp_gmpq(x, lambda)
     as.bigq(res)
   }
 }
@@ -59,35 +61,57 @@ SchurCPP <- function(x, lambda) {
 #' @param n number of variables, a positive integer
 #' @param lambda an integer partition, given as a vector of decreasing
 #'   integers
-#' @param alpha positive rational number, given as a string such as
+#' @param alpha rational number, given as a string such as
 #'   \code{"2/3"} or as a \code{bigq} number
+#' @param which which Jack polynomial, \code{"J"}, \code{"P"}, \code{"Q"},
+#'   or \code{"C"}
 #'
 #' @return A \code{qspray} multivariate polynomial.
 #'
 #' @export
-#' @importFrom qspray qsprayMaker
-#' @importFrom gmp as.bigq
+#' @importFrom gmp as.bigq factorialZ
+#' @importFrom qspray qspray_from_list ESFpoly
 #'
 #' @examples
-#' JackPolCPP(3, lambda = c(3, 1), alpha = "2/5")
-JackPolCPP <- function(n, lambda, alpha) {
+#' JackPol(3, lambda = c(3, 1), alpha = "2/5")
+JackPol <- function(n, lambda, alpha, which = "J") {
   stopifnot(isPositiveInteger(n), isPartition(lambda))
+  lambda <- as.integer(lambda[lambda != 0])
   alpha <- as.bigq(alpha)
-  stopifnot(alpha >= 0)
+  if(is.na(alpha)) {
+    stop("Invalid `alpha`.")
+  }
+  which <- match.arg(which, c("J", "P", "Q", "C"))
   alpha <- as.character(alpha)
-  x <- JackPolRcpp(as.integer(n), as.integer(lambda), alpha)
-  qsprayMaker(x[["exponents"]], x[["coeffs"]])
+  if(alpha == "0") {
+    lambdaPrime <- dualPartition(lambda)
+    f <- prod(factorialZ(lambdaPrime))
+    JackPolynomial <- f * ESFpoly(n, lambdaPrime)
+  } else {
+    JackPolynomial <-
+      qspray_from_list(JackPolRcpp(as.integer(n), lambda, alpha))
+  }
+  if(which != "J") {
+    K <- switch(
+      which,
+      "P" = 1L / prod(hookLengths_gmp(lambda, alpha)[1L, ]),
+      "Q" = 1L / prod(hookLengths_gmp(lambda, alpha)[2L, ]),
+      "C" = JackCcoefficient(lambda, alpha)
+    )
+    JackPolynomial <- K * JackPolynomial
+  }
+  JackPolynomial
 }
 
 #' Evaluation of Jack polynomial - C++ implementation
 #'
 #' Evaluates the Jack polynomial.
 #'
-#' @param x variables, a vector of \code{bigq} numbers, or a vector that can
-#'   be coerced as such (e.g. \code{c("2", "5/3")})
+#' @param x values of the variables, a vector of \code{bigq} numbers, or a
+#'   vector that can be coerced as such (e.g. \code{c("2", "5/3")})
 #' @param lambda an integer partition, given as a vector of decreasing
 #'   integers
-#' @param alpha positive rational number, given as a string such as
+#' @param alpha rational number, given as a string such as
 #'   \code{"2/3"} or as a \code{bigq} number
 #'
 #' @return A \code{bigq} number.
@@ -96,57 +120,66 @@ JackPolCPP <- function(n, lambda, alpha) {
 #' @importFrom gmp as.bigq
 #'
 #' @examples
-#' JackCPP(c("1", "3/2", "-2/3"), lambda = c(3, 1), alpha = "1/4")
-JackCPP <- function(x, lambda, alpha) {
+#' Jack(c("1", "3/2", "-2/3"), lambda = c(3, 1), alpha = "1/4")
+Jack <- function(x, lambda, alpha) {
   stopifnot(isPartition(lambda))
-  if(is.numeric(x) && is.numeric(alpha)) {
-    stopifnot(alpha >= 0)
+  lambda <- as.integer(lambda[lambda != 0])
+  if(is.numeric(x)) {
     x <- as.double(x)
-    if(anyNA(x)) {
-      stop("Found missing values in `x`.")
+    gmp <- FALSE
+  } else {
+    x <- as.bigq(x)
+    gmp <- TRUE
+  }
+  if(anyNA(x)) {
+    stop("Found missing values in `x`.")
+  }
+  if(alpha == 0) {
+    lambdaPrime <- dualPartition(lambda)
+    if(gmp){
+      f <- prod(factorialZ(lambdaPrime))
+    }else{
+      f <- prod(factorial(lambdaPrime))
     }
-    JackEvalRcpp_double(x, as.integer(lambda), alpha)
+    return(f * ESF(x, lambdaPrime))
+  }
+  if(is.numeric(x) && is.numeric(alpha)) {
+    JackEvalRcpp_double(x, lambda, alpha)
   } else {
     alpha <- as.bigq(alpha)
-    stopifnot(alpha >= 0)
-    alpha <- as.character(alpha)
-    x <- as.character(as.bigq(x))
-    if(anyNA(x)) {
-      stop("Found missing values in `x`.")
+    if(is.na(alpha)) {
+      stop("Invalid `alpha`.")
     }
-    res <- JackEvalRcpp_gmpq(x, as.integer(lambda), alpha)
+    alpha <- as.character(alpha)
+    res <- JackEvalRcpp_gmpq(as.character(x), lambda, alpha)
     as.bigq(res)
   }
 }
 
 #' Zonal polynomial - C++ implementation
 #'
-#' Returns the Zonal polynomial.
+#' Returns the zonal polynomial.
 #'
-#' @param m number of variables, a positive integer
+#' @param n number of variables, a positive integer
 #' @param lambda an integer partition, given as a vector of decreasing
 #'   integers
 #'
 #' @return A \code{qspray} multivariate polynomial.
 #'
 #' @export
-#' @importFrom gmp as.bigq factorialZ
 #' @examples
-#' ZonalPolCPP(3, lambda = c(3, 1))
-ZonalPolCPP <- function(m, lambda){
-  twoq <- as.bigq("2")
-  jack <- JackPolCPP(m, lambda, alpha = "2")
-  jlambda <- prod(hookLengths_gmp(lambda, alpha = twoq))
-  n <- sum(lambda)
-  (twoq^n * factorialZ(n) / jlambda) * jack
+#' ( zonal <- ZonalPol(3, lambda = c(3, 1)) )
+#' zonal == JackPol(3, lambda = c(3, 1), alpha = "2", which = "C")
+ZonalPol <- function(n, lambda){
+  JackPol(n, lambda, alpha = "2", which = "C")
 }
 
 #' Evaluation of zonal polynomial - C++ implementation
 #'
 #' Evaluates the zonal polynomial.
 #'
-#' @param x variables, a vector of \code{bigq} numbers, or a vector that can
-#'   be coerced as such (e.g. \code{c("2", "5/3")})
+#' @param x values of the variables, a vector of \code{bigq} numbers, or a
+#'   vector that can be coerced as such (e.g. \code{c("2", "5/3")})
 #' @param lambda an integer partition, given as a vector of decreasing
 #'   integers
 #'
@@ -156,19 +189,16 @@ ZonalPolCPP <- function(m, lambda){
 #' @importFrom gmp as.bigq factorialZ asNumeric
 #'
 #' @examples
-#' ZonalCPP(c("1", "3/2", "-2/3"), lambda = c(3, 1))
-ZonalCPP <- function(x, lambda){
+#' Zonal(c("1", "3/2", "-2/3"), lambda = c(3, 1))
+Zonal <- function(x, lambda){
+  lambda <- as.integer(lambda[lambda != 0])
+  C <- JackCcoefficient(lambda, 2L)
   if(is.numeric(x)) {
-    jack <- JackCPP(x, lambda, alpha = 2)
-    jlambda <- asNumeric(prod(hookLengths_gmp(lambda, alpha = as.bigq("2"))))
-    n <- sum(lambda)
-    (factorial(n) * 2^n / jlambda) * jack
+    jack <- Jack(x, lambda, alpha = 2L)
+    asNumeric(C) * jack
   } else {
-    twoq <- as.bigq("2")
-    jack <- JackCPP(x, lambda, alpha = "2")
-    jlambda <- prod(hookLengths_gmp(lambda, alpha = twoq))
-    n <- sum(lambda)
-    (twoq^n * factorialZ(n) / jlambda) * jack
+    jack <- Jack(x, lambda, alpha = "2")
+    C * jack
   }
 }
 
@@ -177,51 +207,44 @@ ZonalCPP <- function(x, lambda){
 #'
 #' Returns the quaternionic zonal polynomial.
 #'
-#' @param m number of variables, a positive integer
+#' @param n number of variables, a positive integer
 #' @param lambda an integer partition, given as a vector of decreasing
 #'   integers
 #'
 #' @return A \code{qspray} multivariate polynomial.
 #'
 #' @export
-#' @importFrom gmp as.bigq factorialZ
 #' @examples
-#' ZonalQPolCPP(3, lambda = c(3, 1))
-ZonalQPolCPP <- function(m, lambda){
-  onehalfq <- as.bigq("1/2")
-  jack <- JackPolCPP(m, lambda, alpha = onehalfq)
-  jlambda <- prod(hookLengths_gmp(lambda, alpha = onehalfq))
-  n <- sum(lambda)
-  as.qspray(onehalfq^n * factorialZ(n) / jlambda) * jack
+#' ( zonalQ <- ZonalQPol(3, lambda = c(3, 1)) )
+#' zonalQ == JackPol(3, lambda = c(3, 1), alpha = "1/2", which = "C")
+ZonalQPol <- function(n, lambda){
+  JackPol(n, lambda, alpha = "1/2", which = "C")
 }
 
 #' Evaluation of zonal quaternionic polynomial - C++ implementation
 #'
 #' Evaluates the zonal quaternionic polynomial.
 #'
-#' @param x variables, a vector of \code{bigq} numbers, or a vector that can
-#'   be coerced as such (e.g. \code{c("2", "5/3")})
+#' @param x values of the variables, a vector of \code{bigq} numbers, or a
+#'   vector that can be coerced as such (e.g. \code{c("2", "5/3")})
 #' @param lambda an integer partition, given as a vector of decreasing
 #'   integers
 #'
 #' @return A \code{bigq} number.
 #'
 #' @export
-#' @importFrom gmp as.bigq factorialZ asNumeric
+#' @importFrom gmp asNumeric
 #'
 #' @examples
-#' ZonalQCPP(c("1", "3/2", "-2/3"), lambda = c(3, 1))
-ZonalQCPP <- function(x, lambda){
+#' ZonalQ(c("1", "3/2", "-2/3"), lambda = c(3, 1))
+ZonalQ <- function(x, lambda){
+  lambda <- as.integer(lambda[lambda != 0])
+  C <- JackCcoefficient(lambda, "1/2")
   if(is.numeric(x)) {
-    jack <- JackCPP(x, lambda, alpha = 0.5)
-    jlambda <- asNumeric(prod(hookLengths_gmp(lambda, alpha = as.bigq("1/2"))))
-    n <- sum(lambda)
-    (factorial(n) / 2^n / jlambda) * jack
+    jack <- Jack(x, lambda, alpha = 0.5)
+    asNumeric(C) * jack
   } else {
-    onehalfq <- as.bigq("1/2")
-    jack <- JackCPP(x, lambda, alpha = "1/2")
-    jlambda <- prod(hookLengths_gmp(lambda, alpha = onehalfq))
-    n <- sum(lambda)
-    (onehalfq^n * factorialZ(n) / jlambda) * jack
+    jack <- Jack(x, lambda, alpha = "1/2")
+    C * jack
   }
 }
