@@ -14,18 +14,22 @@ insertWith <- function(f, mp, key, value) {
 #' @param mu,nu integer partitions, given as vectors of decreasing integers
 #' @param output the type of the output, \code{"dataframe"} or \code{"list"}
 #'
-#' @return This computes the expression of the two Schur polynomials
-#'   associated to \code{mu} and \code{nu} as a linear combination of Schur
-#'   polynomials. If \code{output="dataframe"}, the output is a dataframe with
-#'   two columns: the column \code{coeff} gives the coefficients of this
-#'   linear combination, and the column \code{lambda} gives the partitions
-#'   defining the Schur polynomials of this linear combination as character
-#'   strings, e.g. the partition \code{c(4, 3, 1)} is given by \code{"4, 3, 1"}.
-#'   If \code{output="list"}, the output is a list with two fields: the field
-#'   \code{coeff} is the vector made of the coefficients of the linear
-#'   combination, and the field \code{lambda} is the list of partitions
-#'   defining the Schur polynomials of the linear combination given as
-#'   integer vectors.
+#' @return This computes the expression of the product of the two Schur
+#'   polynomials associated to \code{mu} and \code{nu} as a linear combination
+#'   of Schur polynomials. If \code{output="dataframe"}, the output is a
+#'   dataframe with two columns: the column \code{coeff} gives the coefficients
+#'   of this linear combination, these are positive integers, and the column
+#'   \code{lambda} gives the partitions defining the Schur polynomials of this
+#'   linear combination as character strings, e.g. the partition
+#'   \code{c(4, 3, 1)} is encoded by the character string \code{"[4, 3, 1]"}.
+#'   If \code{output="list"}, the output is a list
+#'   of lists with two elements. Each of these lists with two elements
+#'   corresponds to a term of the linear combination: the first element,
+#'   named \code{coeff}, is the coefficient, namely the Littlewood-Richardson
+#'   coefficient \eqn{c^{\lambda}_{\mu,\nu}}, where \eqn{\lambda} is the
+#'   integer partition given in the second element of the list, named
+#'   \code{lambda}, which defines the Schur polynomial of the
+#'   linear combination.
 #' @export
 #'
 #' @examples
@@ -33,25 +37,30 @@ insertWith <- function(f, mp, key, value) {
 #' mu <- c(2, 1)
 #' nu <- c(3, 2, 1)
 #' LR <- LRmult(mu, nu, output = "list")
-#' LRcoeffs <- LR$coeff
-#' LRparts <- LR$lambda
-#' LRterms <- lapply(1:length(LRcoeffs), function(i) {
-#'   LRcoeffs[i] * SchurPol(3, LRparts[[i]])
+#' LRterms <- lapply(LR, function(lr) {
+#'   lr[["coeff"]] * SchurPol(3, lr[["lambda"]])
 #' })
 #' smu_times_snu <- Reduce(`+`, LRterms)
-#' smu_times_snu == SchurPol(3, mu) * SchurPol(3, nu)
+#' smu_times_snu == SchurPol(3, mu) * SchurPol(3, nu) # should be TRUE
 LRmult <- function(mu, nu, output = "dataframe") {
   stopifnot(isPartition(mu), isPartition(nu))
   output <- match.arg(output, c("dataframe", "list"))
   add <- function(old, lambda) {
-    insertWith(`+`, old, toString(lambda), 1L)
+    insertWith(`+`, old, partitionAsString(lambda), 1L)
   }
   v <- Reduce(add, addMu(mu, nu), init = integer(0L))
   if(output == "dataframe") {
     data.frame("coeff" = v, "lambda" = names(v))
   } else {
-    partitions <- lapply(strsplit(names(v), ","), as.integer)
-    list("coeff" = unname(v), "lambda" = partitions)
+    lambdasAsStrings <- names(v)
+    out <- lapply(lambdasAsStrings, function(lambdaAsString) {
+      list(
+        "coeff"  = v[[lambdaAsString]],
+        "lambda" = fromPartitionAsString(lambdaAsString)
+      )
+    })
+    names(out) <- lambdasAsStrings
+    out
   }
 }
 
@@ -171,16 +180,22 @@ diffSeq <- function(x) {
 #'
 #' @return This computes the expression of the skew Schur polynomial
 #'   associated to the skew partition defined by \code{lambda} and \code{mu}
-#'   as a linear combination of Schur polynomials. If \code{output="dataframe"},
+#'   as a linear combination of Schur polynomials. Every coefficient of this
+#'   linear combination is a positive integer, a so-called
+#'   Littlewood-Richardson coefficient.
+#'   If \code{output="dataframe"},
 #'   the output is a dataframe with two columns: the column \code{coeff} gives
 #'   the coefficients of this linear combination, and the column \code{nu}
 #'   gives the partitions defining the Schur polynomials of this linear
 #'   combination as character strings, e.g. the partition \code{c(4, 3, 1)} is
-#'   given by \code{"4, 3, 1"}. If \code{output="list"}, the output is a list
-#'   with two fields: the field \code{coeff} is the vector made of the
-#'   coefficients of the linear combination, and the field \code{nu} is the
-#'   list of partitions defining the Schur polynomials of the linear combination
-#'   given as integer vectors.
+#'   given by \code{"[4, 3, 1]"}. If \code{output="list"}, the output is a list
+#'   of lists with two elements. Each of these lists with two elements
+#'   corresponds to a term of the linear combination: the first element, named
+#'   \code{coeff}, is the coefficient, namely the Littlewood-Richardson
+#'   coefficient \eqn{c^{\lambda}_{\mu,\nu}}, where \eqn{\nu} is the integer
+#'   partition given in the second element of the list, named
+#'   \code{nu}, which defines the Schur polynomial of the linear
+#'   combination.
 #' @export
 #'
 #' @examples
@@ -189,15 +204,30 @@ diffSeq <- function(x) {
 LRskew <- function(lambda, mu, output = "dataframe") {
   stopifnot(isPartition(lambda), isPartition(mu))
   output <- match.arg(output, c("list", "dataframe"))
-  l <- length(lambda)
-  mu <- c(mu, rep(0L, l - length(mu)))
-  if(any(lambda - mu < 0L)) {
+  lambda <- as.integer(removeTrailingZeros(lambda))
+  mu <- as.integer(removeTrailingZeros(mu))
+  ellLambda <- length(lambda)
+  ellMu <- length(mu)
+  if(ellLambda < ellMu) {
     stop("The partition `mu` is not a subpartition of the partition `lambda`.")
   }
-  f <- function(old, nu) {
-    insertWith(`+`, old, toString(nu), 1L)
+  mu <- c(mu, rep(0L, ellLambda - ellMu))
+  if(any(lambda < mu)) {
+    stop("The partition `mu` is not a subpartition of the partition `lambda`.")
   }
-  Liab <- rev(zip3(seq_len(l), lambda, mu))
+  n <- sum(lambda - mu)
+  if(n == 0L) {
+    if(output == "dataframe") {
+      return(data.frame("coeff" = 1L, "nu" = "[]"))
+    } else {
+      return(list(list("coeff" = 1L, "nu" = integer(0L))))
+#      return(list("coeff" = 1L, "nu" = list(integer(0L))))
+    }
+  }
+  f <- function(old, nu) {
+    insertWith(`+`, old, partitionAsString(nu), 1L)
+  }
+  Liab <- rev(zip3(seq_len(ellLambda), lambda, mu))
   diagram <- do.call(rbind, do.call(c, lapply(Liab, function(iab) {
     i <- iab[1L]
     a <- iab[2L]
@@ -207,14 +237,22 @@ LRskew <- function(lambda, mu, output = "dataframe") {
       c(i, j)
     })
   })))
-  n <- sum(lambda - mu)
   Lnu <- lapply(fillings(n, diagram), `[[`, 1L)
   v <- Reduce(f, Lnu, init = integer(0L))
   if(output == "dataframe") {
     data.frame("coeff" = v, "nu" = names(v))
   } else {
-    partitions <- lapply(strsplit(names(v), ","), as.integer)
-    list("coeff" = unname(v), "nu" = partitions)
+    nusAsStrings <- names(v)
+    out <- lapply(nusAsStrings, function(nuAsString) {
+      list(
+        "coeff" = v[[nuAsString]],
+        "nu" = fromPartitionAsString(nuAsString)
+      )
+    })
+    names(out) <- nusAsStrings
+    out
+    # partitions <- lapply(names(v), fromPartitionAsString)
+    # list("coeff" = unname(v), "nu" = partitions)
   }
 }
 
@@ -232,9 +270,11 @@ fillings <- function(n, diagram) {
     x <- xy[1L]
     y <- xy[2L]
     rest <- diagram[-1L, , drop = FALSE]
-    diagram <- apply(diagram, 1L, toString)
-    upper <- n + 1L - match(toString(c(x, y + 1L)), diagram, nomatch = n + 1L)
-    lower <- n + 1L - match(toString(c(x - 1L, y)), diagram, nomatch = n + 1L)
+    diagram <- apply(diagram, 1L, partitionAsString)
+    upper <-
+      n + 1L - match(partitionAsString(c(x, y + 1L)), diagram, nomatch = n + 1L)
+    lower <-
+      n + 1L - match(partitionAsString(c(x - 1L, y)), diagram, nomatch = n + 1L)
     L <- lapply(fillings(n - 1L, rest), function(filling) {
       nextLetter(lower, upper, filling)
     })
@@ -310,10 +350,13 @@ finish <- function(xxs) {
 SkewSchurPol <- function(n, lambda, mu) {
   stopifnot(isPositiveInteger(n))
   LR <- LRskew(lambda, mu, output = "list")
-  LRcoeffs <- LR[["coeff"]]
-  LRparts <- LR[["nu"]]
-  LRterms <- lapply(1:length(LRcoeffs), function(i) {
-    LRcoeffs[i] * SchurPol(n, LRparts[[i]])
+  LRterms <- lapply(LR, function(coeff_nu) {
+    coeff_nu[["coeff"]] * SchurPol(n, coeff_nu[["nu"]])
   })
+  # LRcoeffs <- LR[["coeff"]]
+  # LRparts <- LR[["nu"]]
+  # LRterms <- lapply(1:length(LRcoeffs), function(i) {
+  #   LRcoeffs[i] * SchurPol(n, LRparts[[i]])
+  # })
   Reduce(`+`, LRterms)
 }

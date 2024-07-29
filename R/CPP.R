@@ -1,6 +1,7 @@
 #' Schur polynomial - C++ implementation
 #'
-#' Returns the Schur polynomial.
+#' @description Returns a Schur polynomial. The Schur polynomials are the
+#'   Jack \eqn{P}-polynomials with Jack parameter \eqn{\alpha=1}.
 #'
 #' @param n number of variables, a positive integer
 #' @param lambda an integer partition, given as a vector of decreasing
@@ -9,20 +10,27 @@
 #' @return A \code{qspray} multivariate polynomial.
 #'
 #' @export
-#' @importFrom qspray qspray_from_list
+#' @importFrom qspray qspray_from_list qone qzero
 #'
 #' @examples
 #' ( schur <- SchurPol(3, lambda = c(3, 1)) )
 #' schur == JackPol(3, lambda = c(3, 1), alpha = "1", which = "P")
 SchurPol <- function(n, lambda) {
   stopifnot(isPositiveInteger(n), isPartition(lambda))
-  lambda <- as.integer(lambda[lambda != 0])
-  qspray_from_list(SchurPolRcpp(as.integer(n), lambda))
+  lambda <- as.integer(removeTrailingZeros(lambda))
+  if(length(lambda) == 0L) {
+    qone()
+  } else if(n == 0L){
+    qzero()
+  } else {
+    qspray_from_list(SchurPolRcpp(as.integer(n), lambda))
+  }
 }
 
 #' Evaluation of Schur polynomial - C++ implementation
 #'
-#' Evaluates the Schur polynomial.
+#' @description Evaluates a Schur polynomial. The Schur polynomials are the
+#'   Jack \eqn{P}-polynomials with Jack parameter \eqn{\alpha=1}.
 #'
 #' @param x values of the variables, a vector of \code{bigq} numbers, or a
 #'   vector that can be coerced as such (e.g. \code{c("2", "5/3")})
@@ -38,7 +46,7 @@ SchurPol <- function(n, lambda) {
 #' Schur(c("1", "3/2", "-2/3"), lambda = c(3, 1))
 Schur <- function(x, lambda) {
   stopifnot(isPartition(lambda))
-  lambda <- as.integer(lambda[lambda != 0])
+  lambda <- as.integer(removeTrailingZeros(lambda))
   if(is.numeric(x)) {
     if(anyNA(x)) {
       stop("Found missing values in `x`.")
@@ -56,7 +64,7 @@ Schur <- function(x, lambda) {
 
 #' Jack polynomial - C++ implementation
 #'
-#' Returns the Jack polynomial.
+#' Returns a Jack polynomial.
 #'
 #' @param n number of variables, a positive integer
 #' @param lambda an integer partition, given as a vector of decreasing
@@ -70,16 +78,22 @@ Schur <- function(x, lambda) {
 #'
 #' @export
 #' @importFrom gmp as.bigq factorialZ
-#' @importFrom qspray qspray_from_list ESFpoly
+#' @importFrom qspray qspray_from_list ESFpoly qone qzero
 #'
 #' @examples
 #' JackPol(3, lambda = c(3, 1), alpha = "2/5")
 JackPol <- function(n, lambda, alpha, which = "J") {
   stopifnot(isPositiveInteger(n), isPartition(lambda))
-  lambda <- as.integer(lambda[lambda != 0])
+  lambda <- as.integer(removeTrailingZeros(lambda))
   alpha <- as.bigq(alpha)
   if(is.na(alpha)) {
     stop("Invalid `alpha`.")
+  }
+  if(length(lambda) == 0L) {
+    return(qone())
+  }
+  if(n == 0L){
+    return(qzero())
   }
   which <- match.arg(which, c("J", "P", "Q", "C"))
   alpha <- as.character(alpha)
@@ -105,7 +119,7 @@ JackPol <- function(n, lambda, alpha, which = "J") {
 
 #' Evaluation of Jack polynomial - C++ implementation
 #'
-#' Evaluates the Jack polynomial.
+#' Evaluates a Jack polynomial.
 #'
 #' @param x values of the variables, a vector of \code{bigq} numbers, or a
 #'   vector that can be coerced as such (e.g. \code{c("2", "5/3")})
@@ -123,7 +137,7 @@ JackPol <- function(n, lambda, alpha, which = "J") {
 #' Jack(c("1", "3/2", "-2/3"), lambda = c(3, 1), alpha = "1/4")
 Jack <- function(x, lambda, alpha) {
   stopifnot(isPartition(lambda))
-  lambda <- as.integer(lambda[lambda != 0])
+  lambda <- as.integer(removeTrailingZeros(lambda))
   if(is.numeric(x)) {
     x <- as.double(x)
     gmp <- FALSE
@@ -158,7 +172,8 @@ Jack <- function(x, lambda, alpha) {
 
 #' Zonal polynomial - C++ implementation
 #'
-#' Returns the zonal polynomial.
+#' @description Returns a zonal polynomial. The zonal polynomials are the
+#'   Jack \eqn{C}-polynomials with Jack parameter \eqn{\alpha=Z}.
 #'
 #' @param n number of variables, a positive integer
 #' @param lambda an integer partition, given as a vector of decreasing
@@ -176,7 +191,8 @@ ZonalPol <- function(n, lambda){
 
 #' Evaluation of zonal polynomial - C++ implementation
 #'
-#' Evaluates the zonal polynomial.
+#' @description Evaluates a zonal polynomial. The zonal polynomials are the
+#'   Jack \eqn{C}-polynomials with Jack parameter \eqn{\alpha=Z}.
 #'
 #' @param x values of the variables, a vector of \code{bigq} numbers, or a
 #'   vector that can be coerced as such (e.g. \code{c("2", "5/3")})
@@ -191,7 +207,7 @@ ZonalPol <- function(n, lambda){
 #' @examples
 #' Zonal(c("1", "3/2", "-2/3"), lambda = c(3, 1))
 Zonal <- function(x, lambda){
-  lambda <- as.integer(lambda[lambda != 0])
+  lambda <- as.integer(removeTrailingZeros(lambda))
   C <- JackCcoefficient(lambda, 2L)
   if(is.numeric(x)) {
     jack <- Jack(x, lambda, alpha = 2L)
@@ -205,7 +221,9 @@ Zonal <- function(x, lambda){
 
 #' Quaternionic zonal polynomial - C++ implementation
 #'
-#' Returns the quaternionic zonal polynomial.
+#' @description Returns a quaternionic zonal polynomial. The quaternionic
+#'   zonal polynomials are the Jack \eqn{C}-polynomials with Jack
+#'   parameter \eqn{\alpha=1/Z}.
 #'
 #' @param n number of variables, a positive integer
 #' @param lambda an integer partition, given as a vector of decreasing
@@ -223,7 +241,9 @@ ZonalQPol <- function(n, lambda){
 
 #' Evaluation of zonal quaternionic polynomial - C++ implementation
 #'
-#' Evaluates the zonal quaternionic polynomial.
+#' @description Evaluates a zonal quaternionic polynomial. The quaternionic
+#'   zonal polynomials are the Jack \eqn{C}-polynomials with Jack
+#'   parameter \eqn{\alpha=1/Z}.
 #'
 #' @param x values of the variables, a vector of \code{bigq} numbers, or a
 #'   vector that can be coerced as such (e.g. \code{c("2", "5/3")})
@@ -238,7 +258,7 @@ ZonalQPol <- function(n, lambda){
 #' @examples
 #' ZonalQ(c("1", "3/2", "-2/3"), lambda = c(3, 1))
 ZonalQ <- function(x, lambda){
-  lambda <- as.integer(lambda[lambda != 0])
+  lambda <- as.integer(removeTrailingZeros(lambda))
   C <- JackCcoefficient(lambda, "1/2")
   if(is.numeric(x)) {
     jack <- Jack(x, lambda, alpha = 0.5)

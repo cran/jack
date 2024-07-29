@@ -1,7 +1,72 @@
 #' @importFrom partitions conjugate parts
 #' @importFrom gmp as.bigq is.bigq
-#' @importFrom utils tail
+#' @importFrom utils tail head
+#' @importFrom qspray qlone
 NULL
+
+pairing <- function(lambdas) {
+  mapply(
+    function(lambda1, lambda2) {
+      list(lambda1, lambda2)
+    },
+    tail(lambdas, -1L), head(lambdas, -1L),
+    USE.NAMES = FALSE, SIMPLIFY = FALSE
+  )
+}
+
+lastSubpartition <- function(w, lambda) {
+  if(w == 0L || length(lambda) == 0L) {
+    integer(0L)
+  } else {
+    k <- lambda[1L]
+    if(w <= k) {
+      w
+    } else {
+      c(k, lastSubpartition(w - k, tail(lambda, -1L)))
+    }
+  }
+}
+
+isDecreasing <- function(x) {
+  all(diff(x) <= 0)
+}
+
+isIncreasing <- function(x) {
+  all(diff(x) >= 0)
+}
+
+.rg <- function(start, end) {
+  if(start <= end) {
+    start:end
+  } else {
+    integer(0L)
+  }
+}
+
+#' @importFrom utils head
+#' @noRd
+removeTrailingZeros <- function(x) {
+  n <- length(x)
+  while(x[n] == 0 && n > 0L) {
+    n <- n - 1L
+  }
+  head(x, n)
+}
+
+Columns <- function(M) {
+  lapply(seq_len(ncol(M)), function(j) {
+    M[, j]
+  })
+}
+
+partitionAsString <- function(lambda) {
+  paste0("[", toString(lambda), "]")
+}
+
+fromPartitionAsString <- function(string) {
+  string <- gsub("(\\[|\\])", "", string)
+  as.integer(strsplit(string, ",", fixed = TRUE)[[1L]])
+}
 
 isInteger <- function(n){
   is.vector(n) && is.numeric(n) &&
@@ -187,8 +252,20 @@ symbolicJackCcoefficient <- function(lambda) {
 }
 
 #####
+listOfPartitions <- function(n) {
+  if(n == 0L) {
+    list(integer(0L))
+  } else {
+    apply(parts(n), 2L, removeTrailingZeros, simplify = FALSE)
+  }
+}
+
 isDominated <- function(mu, lambda){
   n <- sum(lambda)
+  # assumption: n == sum(mu)
+  # if(sum(mu) != n) {
+  #   return(FALSE)
+  # }
   lambda <- lambda[seq_len(match(0L, lambda, nomatch = length(lambda)+1L)-1L)]
   lambda <- c(lambda, rep(0L, n-length(lambda)))
   mu <- mu[seq_len(match(0L, mu, nomatch = length(mu)+1L)-1L)]
@@ -206,11 +283,34 @@ dominatedPartitions <- function(lambda){
            drop = FALSE]
 }
 
+listOfDominatedPartitions <- function(lambda) {
+  n <- length(lambda)
+  if(n == 0L) {
+    return(list(integer(0L)))
+  }
+  go <- function(h, w, dds, e) {
+    if(w == 0L) {
+      list(integer(0L))
+    } else {
+      arange <- seq_len(min(h, dds[1L] - e))
+      do.call(c, lapply(arange, function(a) {
+        L <- go(a, w-a, dds[-1L], e+a)
+        lapply(L, function(as) {
+          c(a, as)
+        })
+      }))
+    }
+  }
+  weight <- sum(lambda)
+  dsums <- c(cumsum(lambda), rep(weight, weight - n))
+  go(lambda[1L], weight, dsums, 0L)
+}
+
 betweenPartitions <- function(mu, lambda){
   doms <- dominatedPartitions(lambda)
   n <- sum(mu)
-  doms[,apply(doms, 2L, function(p){
-    isDominated(mu,p) && !all(c(mu, rep(0L,n-length(mu)))==p)
+  doms[, apply(doms, 2L, function(p){
+    isDominated(mu,p) && !all(c(mu, rep(0L, n-length(mu))) == p)
   }), drop = FALSE]
 }
 
@@ -220,7 +320,7 @@ betweenPartitions <- function(mu, lambda){
 
 #####
 .n <- function(lambda){
-  sum((seq_len(length(lambda))-1L)*lambda)
+  sum(seq_len(length(lambda)-1L) * tail(lambda, -1L))
 }
 
 .e <- function(lambda, alpha){
@@ -229,6 +329,15 @@ betweenPartitions <- function(mu, lambda){
   }else{
     alpha * .n(dualPartition(lambda)) - .n(lambda)
   }
+}
+
+.eSymbolic <- function(lambda){
+  .n(dualPartition(lambda))*qlone(1) - .n(lambda)
+}
+
+
+fromString <- function(string) {
+  as.integer(strsplit(string, ",", fixed = TRUE)[[1L]])
 }
 
 ####
@@ -250,6 +359,7 @@ as_mvp_qspray <- function(s) {
   mvp(vars, s@powers, asNumeric(as.bigq(s@coeffs)))
 }
 
-#' @importFrom qspray as.qspray
+#' @importFrom qspray as.qspray qzero qone
 #' @importFrom spray zero one lone
 NULL
+

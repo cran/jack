@@ -16,16 +16,22 @@ LRskew(lambda, mu, output = "dataframe")
 \value{
 This computes the expression of the skew Schur polynomial
   associated to the skew partition defined by \code{lambda} and \code{mu}
-  as a linear combination of Schur polynomials. If \code{output="dataframe"},
+  as a linear combination of Schur polynomials. Every coefficient of this
+  linear combination is a positive integer, a so-called
+  Littlewood-Richardson coefficient.
+  If \code{output="dataframe"},
   the output is a dataframe with two columns: the column \code{coeff} gives
   the coefficients of this linear combination, and the column \code{nu}
   gives the partitions defining the Schur polynomials of this linear
   combination as character strings, e.g. the partition \code{c(4, 3, 1)} is
-  given by \code{"4, 3, 1"}. If \code{output="list"}, the output is a list
-  with two fields: the field \code{coeff} is the vector made of the
-  coefficients of the linear combination, and the field \code{nu} is the
-  list of partitions defining the Schur polynomials of the linear combination
-  given as integer vectors.
+  given by \code{"[4, 3, 1]"}. If \code{output="list"}, the output is a list
+  of lists with two elements. Each of these lists with two elements
+  corresponds to a term of the linear combination: the first element, named
+  \code{coeff}, is the coefficient, namely the Littlewood-Richardson
+  coefficient \eqn{c^{\lambda}_{\mu,\nu}}, where \eqn{\nu} is the integer
+  partition given in the second element of the list, named
+  \code{nu}, which defines the Schur polynomial of the linear
+  combination.
 }
 \description{
 Expression of a skew Schur polynomial as a linear
